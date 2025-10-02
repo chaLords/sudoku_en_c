@@ -1,0 +1,13 @@
+Sudoku Generator in C
+Copyright 2025 Gonzalo Ramírez (@chaLords)
+https://github.com/chaLords/sudoku_en_c
+
+This product includes software developed by Gonzalo Ramírez.
+
+Algorithm implementations:
+- Fisher-Yates shuffle: Original implementation by Gonzalo Ramírez
+- Hybrid backtracking approach: Original design by Gonzalo Ramírez
+- Sudoku validation: Original implementation by Gonzalo Ramírez
+
+If you use this software in your project, please provide attribution
+as specified in the Apache License 2.0.

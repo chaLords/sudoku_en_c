@@ -1,0 +1,86 @@
+# Ejecutables
+*.exe
+*.out
+*.app
+sudoku
+a.out
+
+# Archivos objeto
+*.o
+*.obj
+*.ko
+*.elf
+
+# Librerías precompiladas
+*.lib
+*.a
+*.la
+*.lo
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Archivos del enlazador
+*.ld
+
+# Archivos de depuración
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# Archivos de backup y temporales
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Directorios de build
+build/
+bin/
+obj/
+debug/
+release/
+
+# IDEs y editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.atom/
+*.code-workspace
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Archivos de compilación
+compile_commands.json
+.ninja_deps
+.ninja_log
+
+# Valgrind
+vgcore.*
+*.log
+
+# Core dumps
+core
+core.*
+
