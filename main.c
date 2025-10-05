@@ -46,12 +46,12 @@ void num_orden_fisher_yates(int *array, int size, int num_in) {
 // ═══════════════════════════════════════════════════════════════════
 
 bool esSafePosicion(int sudoku[SIZE][SIZE], int fila, int col, int num) {
-    // Verificación de fila si se repite algun numero...si se repite marca false...
+    // Verificación de fila si se repite algun numero, false...
     for(int x = 0; x < SIZE; x++) {
         if(sudoku[fila][x] == num) return false;
     }
     
-    // Verificación de columna se repite algun número, si se repite marca false...
+    // Verificación de columna se repite algun número, false...
     for(int x = 0; x < SIZE; x++) {
         if(sudoku[x][col] == num) return false;
     }
@@ -144,34 +144,227 @@ bool completarSudoku(int sudoku[SIZE][SIZE]) {
     
     return false;
 }
+// ═══════════════════════════════════════════════════════════════════
+//                    MÉTODOS ELIMINACIÓN CELDAS
+// ═══════════════════════════════════════════════════════════════════
 
-// FUNCIÓN PRINCIPAL: Método híbrido completo
-bool generarSudokuHibrido(int sudoku[SIZE][SIZE]) {
+void eleccionNumerosSubCuadriculas(int sudoku[SIZE][SIZE]){
+
+    printf("🎲 FASE 1: Eligiendo números por subcuadrículas con Fisher-Yates...\n");
+
+    int subcuadriculas[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    int random[SIZE];
+    num_orden_fisher_yates(random, SIZE, 1);
+
+    // Agregar esta línea de debug:
+    printf("Array random generado: ");
+    for(int i = 0; i < 9; i++) printf("%d ", random[i]);
+    printf("\n\n");
+
+
+
+    for(int idx = 0; idx < 9; idx++) {
+        int cuadricula = subcuadriculas[idx];
+        
+        int fila_base = (cuadricula/3) * 3;
+        int col_base = (cuadricula%3) * 3;
+        
+        
+        
+        printf("   Subcuadrícula %d (base: %d,%d): ", cuadricula, fila_base, col_base);
+        
+          for(int i = 0; i < SIZE; i++) {
+            int fila = fila_base + (i/3);
+            int col = col_base + (i%3);
+            int valor_a_eliminar = random[idx];
+
+            if(sudoku[fila][col] == valor_a_eliminar){
+              sudoku[fila][col] = 0;
+              printf("%d ", valor_a_eliminar);
+              break;
+            }
+            
+          }
+        printf("\n");
+    }
+    printf("✅ Elección completada!\n\n");
+
+}
+
+bool tieneAlternativaEnFilaCol(int sudoku[SIZE][SIZE], int fila, int col, int num) {
+
+
+    int temp = sudoku[fila][col];
+    sudoku[fila][col] = 0;
+    int posiblesEnFilas = 0;
+    int posiblesEnCol = 0;
+    int posiblesEnSubcuadricula = 0;
+  
+    // Verificación otra posición en la FILA
+    for(int x = 0; x < SIZE; x++) {
+        if(x != col && sudoku[fila][x] == 0){
+            if(esSafePosicion(sudoku, fila, x, num)){
+              posiblesEnFilas++;//Contar, no retornar inmediatamente
+
+           }  
+        }
+    }
+    //Verificación otra posición en la COLUMNA
+    for(int x = 0; x < SIZE; x++){
+        if(x != fila && sudoku[x][col] == 0){
+            if(esSafePosicion(sudoku, x, col, num)){
+              posiblesEnCol++;
+            }
+        }
+
+    }
+    //Verificación otra posición en las SUBCUADRÍCULAS 3X3
+    int inicioFila = fila - fila % 3;
+    int inicioCol = col - col % 3;
     
-  //Iniciar todas las celdas con 0...
+    for(int i=0; i<3; i++){
+        for(int j=0; j<3; j++){
+            int f = inicioFila + i;
+            int c = inicioCol + j;
+            
+            //Saltar la posición original
+            if(f == fila && c == col) continue;
+
+            //Si no es la posición original y está vacías
+            if(sudoku[f][c] == 0 && esSafePosicion(sudoku, f, c, num)){
+                    posiblesEnSubcuadricula++;
+                
+            }
+        }
+    }
+  
+    sudoku[fila][col] = temp; //Restaurar...
+    return (posiblesEnFilas > 0) || (posiblesEnCol > 0) || (posiblesEnSubcuadricula > 0); //No Existen Alternativas se puede quitar....
+
+}
+
+int segundaEleccionNumerosSubCuadriculas(int sudoku[SIZE][SIZE]){
+
+
+    printf("🎲 FASE 2: Eligiendo números por subcuadrículas con Fisher-Yates...\n");
+
+    int subcuadriculas[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    int eliminados = 0; //Contador
+
+
+    for(int idx = 0; idx < 9; idx++) {
+        int cuadricula = subcuadriculas[idx];
+        int fila_base = (cuadricula/3) * 3;
+        int col_base = (cuadricula%3) * 3;
+        
+        
+        
+        printf("   Subcuadrícula_2 %d (base: %d,%d): ", cuadricula, fila_base, col_base);
+        
+        for(int i = 0; i < SIZE; i++) {
+            int fila = fila_base + (i/3);
+            int col = col_base + (i%3);
+            
+            if(sudoku[fila][col] != 0){
+              int numero_actual = sudoku[fila][col];
+
+
+              if(!tieneAlternativaEnFilaCol(sudoku, fila, col, numero_actual)){
+                sudoku[fila][col] = 0;
+                printf("%d", numero_actual);//Imprime segunda corrida de números...
+                eliminados++; //Incrementar contador
+                break;
+              }
+            }
+          }
+          printf("\n");
+    }
+    printf("✅ Elección completada! Eliminados: %d\n\n", eliminados);
+    return eliminados; //Retornar Cuántos eliminó
+
+}
+
+int terceraEleccionLibre(int sudoku[SIZE][SIZE], int num){
+
+    printf("🎯 FASE 3: Eliminación libre hasta objetivo...\n");
+
+    int eliminados = 0;
+    int intentos = 0;
+    int max_intentos = 200;
+
+    while(eliminados < num && intentos < max_intentos){
+        bool elimino_num = false;
+        
+        //Recorrer TODO el tablero
+        for(int fila=0; fila<SIZE && eliminados < num; fila++){
+          for(int col=0; col<SIZE && eliminados < num; col++){
+
+            if(sudoku[fila][col] != 0){
+                int num_actual = sudoku[fila][col];
+                if(!tieneAlternativaEnFilaCol(sudoku, fila, col, num_actual)){
+                    sudoku[fila][col] = 0;
+                    eliminados++;
+                    elimino_num = true;
+                    printf("Eliminado %d en (%d,%d) - Total: %d\n", num_actual, fila, col, eliminados);
+                }
+            }
+          }
+        }
+        if(!elimino_num) break; //Si una pasada completa no eliminó nada, salir...
+        intentos++;
+    }
+    printf("✅ FASE 3 completada! Eliminados: %d\n\n", eliminados);
+    return eliminados;
+}
+// ═══════════════════════════════════════════════════════════════════
+//            FUNCIÓN PRINCIPAL: Método híbrido completo    
+// ═══════════════════════════════════════════════════════════════════
+bool generarSudokuHibrido(int sudoku[SIZE][SIZE]) {
+    //Iniciar todas las celdas con 0...
     for(int i=0; i<SIZE; i++){
       for(int j=0; j<SIZE; j++){
         sudoku[i][j] = 0;
+      }
     }
-  }
     // PASO 1: Método para diagonal (100% confiable)
     llenarDiagonal(sudoku);
     
     // PASO 2: Backtracking para el resto (100% confiable)
     printf("🔄 Completando con backtracking...\n");
-    return completarSudoku(sudoku);
+    bool exito = completarSudoku(sudoku);
+    if(exito){
+        eleccionNumerosSubCuadriculas(sudoku);    
+        // Loop FASE 2
+        int ronda = 1;
+        int eliminados;
+        do {
+        printf("--- RONDA %d ---\n", ronda);
+        eliminados = segundaEleccionNumerosSubCuadriculas(sudoku);
+        ronda++;
+        } while(eliminados > 0);  // Continuar mientras elimine algo    
+      printf("🛑 No se pueden eliminar más números\n");
+      //FASE 3: Libre hasta objetivo
+      int objetivo_adicional = 15;
+      terceraEleccionLibre(sudoku, objetivo_adicional);
+    }  return exito;
 }
-
 // ═══════════════════════════════════════════════════════════════════
 //                    FUNCIONES AUXILIARES
 // ═══════════════════════════════════════════════════════════════════
 
 void imprimirSudoku(int sudoku[SIZE][SIZE]) {
+    int asteriscos = 0;
     printf("┌───────┬───────┬───────┐\n");
     for(int i = 0; i < SIZE; i++) {
         printf("│");
         for(int j = 0; j < SIZE; j++) {
-            printf(" %d", sudoku[i][j]);
+            if(sudoku[i][j] == 0){
+              printf(" *");
+              asteriscos++;
+
+            } else{
+              printf(" %d", sudoku[i][j]);
+            }
             if((j + 1) % 3 == 0) printf(" │");
         }
         printf("\n");
@@ -180,6 +373,7 @@ void imprimirSudoku(int sudoku[SIZE][SIZE]) {
         }
     }
     printf("└───────┴───────┴───────┘\n");
+    printf("Total celdas vacías %d\n", asteriscos); //Mostrar total
 }
 
 bool verificarSudoku(int sudoku[SIZE][SIZE]) {
@@ -204,6 +398,7 @@ bool verificarSudoku(int sudoku[SIZE][SIZE]) {
 // ═══════════════════════════════════════════════════════════════════
 
 int main() {
+    //Inicia semilla random!!!
     srand(time(NULL));
     
     printf("═══════════════════════════════════════════════════════════════\n");
