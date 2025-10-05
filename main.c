@@ -76,7 +76,35 @@ bool encontrarCeldaVacia(int sudoku[SIZE][SIZE], int *fila, int *col) {
     }
     return false;
 }
+int contarSoluciones(int sudoku[SIZE][SIZE], int limite){
 
+  int fila, col; 
+
+    //Si no hay celdas vacías, encontramos una solución...
+    if(!encontrarCeldaVacia(sudoku, &fila, &col)){
+      return 1;
+
+    }
+  int total_soluciones = 0;
+  //Probar números del 1-9
+  for(int num = 1; num <= 9; num++){
+      if(esSafePosicion(sudoku, fila, col, num)){
+        sudoku[fila][col] = num;
+
+        //Acumula soluciones encontradas
+        total_soluciones += contarSoluciones(sudoku, limite);
+
+        //Optimización: si ya encontramos 2+, no seguir buscando
+        if(total_soluciones >= limite){
+          sudoku[fila][col] = 0;
+          return total_soluciones;
+        }
+        sudoku[fila][col] = 0; //Backtrack
+      }
+  }
+  return total_soluciones;
+
+}
 // ═══════════════════════════════════════════════════════════════════
 //                    MÉTODO HÍBRIDO RECOMENDADO
 // ═══════════════════════════════════════════════════════════════════
@@ -284,36 +312,37 @@ int segundaEleccionNumerosSubCuadriculas(int sudoku[SIZE][SIZE]){
 
 }
 
-int terceraEleccionLibre(int sudoku[SIZE][SIZE], int num){
+int terceraEleccionLibre(int sudoku[SIZE][SIZE], int objetivo){
 
     printf("🎯 FASE 3: Eliminación libre hasta objetivo...\n");
 
     int eliminados = 0;
-    int intentos = 0;
-    int max_intentos = 200;
-
-    while(eliminados < num && intentos < max_intentos){
-        bool elimino_num = false;
-        
-        //Recorrer TODO el tablero
-        for(int fila=0; fila<SIZE && eliminados < num; fila++){
-          for(int col=0; col<SIZE && eliminados < num; col++){
-
-            if(sudoku[fila][col] != 0){
-                int num_actual = sudoku[fila][col];
-                if(!tieneAlternativaEnFilaCol(sudoku, fila, col, num_actual)){
-                    sudoku[fila][col] = 0;
+    
+    // Recorrer TODO el tablero
+    for(int fila = 0; fila < SIZE && eliminados < objetivo; fila++) {
+        for(int col = 0; col < SIZE && eliminados < objetivo; col++) {
+            
+            if(sudoku[fila][col] != 0) {
+                int temp = sudoku[fila][col];
+                sudoku[fila][col] = 0;
+                
+                // Contar soluciones (límite 2 es suficiente)
+                int soluciones = contarSoluciones(sudoku, 2);
+                
+                if(soluciones == 1) {
+                    // Mantener eliminado
                     eliminados++;
-                    elimino_num = true;
-                    printf("Eliminado %d en (%d,%d) - Total: %d\n", num_actual, fila, col, eliminados);
+                    printf("Eliminado %d en (%d,%d) - Total: %d\n", 
+                           temp, fila, col, eliminados);
+                } else {
+                    // Restaurar si tiene 0 o 2+ soluciones
+                    sudoku[fila][col] = temp;
                 }
             }
-          }
         }
-        if(!elimino_num) break; //Si una pasada completa no eliminó nada, salir...
-        intentos++;
     }
-    printf("✅ FASE 3 completada! Eliminados: %d\n\n", eliminados);
+    
+    printf("FASE 3 completada! Eliminados: %d\n\n", eliminados);
     return eliminados;
 }
 // ═══════════════════════════════════════════════════════════════════
@@ -344,7 +373,7 @@ bool generarSudokuHibrido(int sudoku[SIZE][SIZE]) {
         } while(eliminados > 0);  // Continuar mientras elimine algo    
       printf("🛑 No se pueden eliminar más números\n");
       //FASE 3: Libre hasta objetivo
-      int objetivo_adicional = 15;
+      int objetivo_adicional = 20;
       terceraEleccionLibre(sudoku, objetivo_adicional);
     }  return exito;
 }
