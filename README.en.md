@@ -340,6 +340,7 @@ sudoku_en_c/
 ├── README.md              # README in Spanish
 ├── README.en.md           # This file (English)
 ├── LICENSE                # Apache 2.0 License
+├── CHANGELOG.md           # Version History
 ├── NOTICE                 # Attribution file
 ├── .gitignore             # Files to ignore in Git
 └── docs/

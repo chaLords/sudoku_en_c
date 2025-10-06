@@ -1,21 +1,21 @@
 # Changelog
 
-Todos los cambios notables en este proyecto serán documentados en este archivo.
+All notable changes to this project will be documented in this file.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
-y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.1.0] - 2025-10-06
 
-### 🌍 Internacionalización Completa del Código
+### 🌍 Full Code Internationalization
 
 #### ⚠️ BREAKING CHANGES
-Esta versión introduce cambios incompatibles con versiones anteriores. Todo el código ha sido traducido al inglés para seguir estándares internacionales.
+This version introduces breaking changes. All code has been translated to English to follow international standards.
 
-### 🔄 Cambiado
+### 🔄 Changed
 
-#### Traducción Completa a Inglés
-- **Todos los nombres de funciones** traducidos de español a inglés:
+#### Complete Translation to English
+- **All function names** translated from Spanish to English:
   - `num_orden_fisher_yates()` → `fisherYatesShuffle()`
   - `esSafePosicion()` → `isSafePosition()`
   - `encontrarCeldaVacia()` → `findEmptyCell()`
@@ -30,7 +30,7 @@ Esta versión introduce cambios incompatibles con versiones anteriores. Todo el 
   - `imprimirSudoku()` → `printSudoku()`
   - `verificarSudoku()` → `validateSudoku()`
 
-- **Todas las variables** traducidas a inglés:
+- **All variables** translated to English:
   - `fila` → `row`
   - `fila_base` → `initial_row`
   - `col_base` → `initial_column`
@@ -52,203 +52,203 @@ Esta versión introduce cambios incompatibles con versiones anteriores. Todo el 
   - `asteriscos` → `asterisks`
   - `intento` → `attempt`
 
-- **Constantes** traducidas:
+- **Constants** translated:
   - `OBJETIVO_FASE3` → `PHASE3_TARGET`
 
-- **Todos los comentarios** en código traducidos a inglés
-- **Todos los mensajes `printf`** traducidos a inglés
-- **Títulos de sección** en código traducidos a inglés
+- **All code comments** translated to English
+- **All `printf` messages** translated to English
+- **Section headers** in code translated to English
 
-#### Documentación Actualizada
-- **README.md**: Actualizado con nombres de funciones en inglés
-- **README.en.md**: Actualizado con nombres de funciones en inglés
-- **TECHNICAL.md**: Actualizado con referencias a funciones en inglés
-- **NOTICE**: Mejorado con requisitos de atribución explícitos
-- Ambos READMEs actualizados con salida real del programa (55 celdas vacías)
-- Demo actualizado mostrando caso donde FASE 2 elimina 0 celdas
+#### Updated Documentation
+- **README.md**: Updated with English function names
+- **README.en.md**: Updated with English function names
+- **TECHNICAL.md**: Updated with references to English functions
+- **NOTICE**: Enhanced with explicit attribution requirements
+- Both READMEs updated with actual program output (55 empty cells)
+- Demo updated showing case where PHASE 2 removes 0 cells
 
-### 📚 Documentación
-- Estructura bilingüe mantenida (documentación en español, código en inglés)
-- Ejemplos de código actualizados en toda la documentación
-- Tablas de funciones actualizadas con nuevos nombres
-- Mensajes de commit documentados para referencia futura
+### 📚 Documentation
+- Bilingual structure maintained (documentation in Spanish, code in English)
+- Code examples updated throughout documentation
+- Function tables updated with new names
+- Commit messages documented for future reference
 
-### ✨ Razones del Cambio
-1. **Colaboración internacional**: Inglés es el estándar en desarrollo de software
-2. **Consistencia**: Todas las bibliotecas estándar de C están en inglés
-3. **Portafolio profesional**: Mejor para aplicaciones laborales
-4. **Mejores prácticas**: Siguiendo estándares de la industria
-5. **Mantenibilidad**: Más fácil para contribuidores de todo el mundo
+### ✨ Reasons for Change
+1. **International collaboration**: English is the standard in software development
+2. **Consistency**: All C standard libraries are in English
+3. **Professional portfolio**: Better for job applications
+4. **Best practices**: Following industry standards
+5. **Maintainability**: Easier for contributors worldwide
 
-### 📝 Nota de Migración
-Proyectos que usen versiones anteriores necesitarán actualizar todas las llamadas a funciones. Se recomienda usar herramientas de búsqueda y reemplazo con los nombres listados arriba.
+### 📝 Migration Note
+Projects using previous versions will need to update all function calls. Using search-and-replace tools with the names listed above is recommended.
 
 ---
 
 ## [2.0.0] - 2025-10-05
 
-### 🎉 Añadido
+### 🎉 Added
 
-#### Sistema de Generación de Puzzles Jugables
-- **Sistema de 3 fases de eliminación de celdas** para crear puzzles jugables
-- **FASE 1**: Eliminación aleatoria por subcuadrícula usando Fisher-Yates
-  - Elimina 1 número aleatorio de cada una de las 9 subcuadrículas
-  - Garantiza distribución uniforme inicial (9 celdas vacías)
-- **FASE 2**: Eliminación iterativa sin alternativas
-  - Loop que elimina números sin alternativas en fila/columna/subcuadrícula
-  - Continúa hasta que no pueda eliminar más
-  - Típicamente elimina 0-25 celdas adicionales (variable según estructura)
-- **FASE 3**: Eliminación libre con verificación de solución única
-  - Intenta eliminar celdas adicionales en orden aleatorio
-  - Verifica solución única usando `countSolutions()` (antes `contarSoluciones()`)
-  - Configurable mediante constante `PHASE3_TARGET` (antes `OBJETIVO_FASE3`) (default: 20)
-  - Resultado típico: 30-54 celdas vacías totales
+#### Playable Puzzle Generation System
+- **3-phase cell elimination system** to create playable puzzles
+- **PHASE 1**: Random elimination per subgrid using Fisher-Yates
+  - Removes 1 random number from each of the 9 subgrids
+  - Guarantees uniform initial distribution (9 empty cells)
+- **PHASE 2**: Iterative elimination without alternatives
+  - Loop that removes numbers with no alternatives in row/column/subgrid
+  - Continues until no more can be removed
+  - Typically removes 0-25 additional cells (varies by structure)
+- **PHASE 3**: Free elimination with unique solution verification
+  - Attempts to remove additional cells in random order
+  - Verifies unique solution using `countSolutions()` (formerly `contarSoluciones()`)
+  - Configurable via `PHASE3_TARGET` constant (formerly `OBJETIVO_FASE3`) (default: 20)
+  - Typical result: 30-54 total empty cells
 
-#### Funciones Nuevas
-- `countSolutions()`: Cuenta el número de soluciones posibles del puzzle
-  - Implementa backtracking con límite configurable
-  - Optimización: early exit al encontrar múltiples soluciones
-  - Garantiza que los puzzles tengan **exactamente una solución**
-- `firstRandomElimination()`: Implementa FASE 1 de eliminación
-- `hasAlternativeInRowCol()`: Verifica si un número tiene alternativas
-- `secondNoAlternativeElimination()`: Implementa FASE 2 con loop
-- `thirdFreeElimination()`: Implementa FASE 3 con verificación única
+#### New Functions
+- `countSolutions()`: Counts the number of possible puzzle solutions
+  - Implements backtracking with configurable limit
+  - Optimization: early exit when finding multiple solutions
+  - Guarantees puzzles have **exactly one solution**
+- `firstRandomElimination()`: Implements PHASE 1 elimination
+- `hasAlternativeInRowCol()`: Checks if a number has alternatives
+- `secondNoAlternativeElimination()`: Implements PHASE 2 with loop
+- `thirdFreeElimination()`: Implements PHASE 3 with unique verification
 
-#### Mejoras de Documentación
-- Comentarios tipo Doxygen en todas las funciones
-- Explicación detallada de cada fase de eliminación
-- Ejemplos de uso y configuración de dificultad
-- Referencias a complejidad algorítmica
-- Documentación técnica completa en `docs/`:
-  - `TECHNICAL.md`: Arquitectura del sistema, análisis de complejidad, benchmarks
-  - `ALGORITHMS.md`: Fundamentos matemáticos, teoremas, pruebas formales
+#### Documentation Improvements
+- Doxygen-style comments on all functions
+- Detailed explanation of each elimination phase
+- Usage examples and difficulty configuration
+- Algorithmic complexity references
+- Complete technical documentation in `docs/`:
+  - `TECHNICAL.md`: System architecture, complexity analysis, benchmarks
+  - `ALGORITHMS.md`: Mathematical foundations, theorems, formal proofs
 
-### 🔄 Cambiado
+### 🔄 Changed
 
-#### Reorganización del Código
-- **Nueva estructura por secciones lógicas**:
-  1. Utilidades básicas (Fisher-Yates)
-  2. Funciones de verificación
-  3. Generación del Sudoku
-  4. Eliminación de celdas (3 fases)
-  5. Función principal
-  6. Funciones auxiliares
+#### Code Reorganization
+- **New logical section structure**:
+  1. Basic utilities (Fisher-Yates)
+  2. Verification functions
+  3. Sudoku generation
+  4. Cell elimination (3 phases)
+  5. Main function
+  6. Auxiliary functions
   7. Main
-- Todas las funciones ahora tienen documentación completa
-- Headers de sección más claros y descriptivos
+- All functions now have complete documentation
+- Clearer and more descriptive section headers
 
-#### Mejoras en la Interfaz
-- **Mensajes de consola más informativos**:
-  - Emojis para mejor experiencia visual (🎲, ✅, 🔄, 🛑, 🎯, etc.)
-  - Progreso detallado de cada fase de eliminación
-  - Contador de celdas eliminadas por fase
-  - Rondas numeradas en FASE 2
-  - Array random generado visible para debugging
-- **Función `printSudoku()` mejorada**:
-  - Asteriscos (*) para celdas vacías en lugar de 0
-  - Contador de celdas vacías/llenas: `Empty cells: 54 | Filled cells: 27`
-  - Formato más limpio y legible
-  - Bordes Unicode para mejor visualización
+#### Interface Improvements
+- **More informative console messages**:
+  - Emojis for better visual experience (🎲, ✅, 🔄, 🛑, 🎯, etc.)
+  - Detailed progress of each elimination phase
+  - Counter of cells removed per phase
+  - Numbered rounds in PHASE 2
+  - Generated random array visible for debugging
+- **Improved `printSudoku()` function**:
+  - Asterisks (*) for empty cells instead of 0
+  - Empty/filled cell counter: `Empty cells: 54 | Filled cells: 27`
+  - Cleaner and more readable format
+  - Unicode borders for better visualization
 
-#### Sistema de Configuración
-- Uso de constante `PHASE3_TARGET` para configuración clara
-- Fácil modificación para diferentes niveles de dificultad
-- Mejor documentación sobre cómo ajustar dificultad
+#### Configuration System
+- Use of `PHASE3_TARGET` constant for clear configuration
+- Easy modification for different difficulty levels
+- Better documentation on how to adjust difficulty
 
-#### Licencia
-- **Cambio a Apache License 2.0** (desde MIT)
-  - Mayor protección de patentes
-  - Requisito explícito de documentar cambios
-  - Mejor protección legal para contribuidores
-  - Archivo `NOTICE` agregado con requisitos de atribución
-- Header de licencia actualizado en `main.c`
-- Archivo `LICENSE` completamente reescrito
-- READMEs actualizados con nueva licencia
+#### License
+- **Changed to Apache License 2.0** (from MIT)
+  - Greater patent protection
+  - Explicit requirement to document changes
+  - Better legal protection for contributors
+  - `NOTICE` file added with attribution requirements
+- Updated license header in `main.c`
+- `LICENSE` file completely rewritten
+- READMEs updated with new license
 
-### 🐛 Corregido
-- Consistencia de licencia entre archivos (antes había conflicto MIT/Apache)
-- Mensajes de error más descriptivos
-- Validación mejorada de celdas vacías
-- Sincronización entre README.md y README.en.md
+### 🐛 Fixed
+- License consistency across files (previously had MIT/Apache conflict)
+- More descriptive error messages
+- Improved empty cell validation
+- Synchronization between README.md and README.en.md
 
-### ⚡ Optimizado
-- `countSolutions()` con early exit para mejor performance (~10^40x speedup)
-- Orden de verificación en `hasAlternativeInRowCol()` optimizado
-- Uso de constantes (#define SIZE) para valores fijos
+### ⚡ Optimized
+- `countSolutions()` with early exit for better performance (~10^40x speedup)
+- Optimized verification order in `hasAlternativeInRowCol()`
+- Use of constants (#define SIZE) for fixed values
 
-### 📚 Documentación
-- README.md actualizado con ejemplos de puzzles jugables
-- README.en.md sincronizado con versión en español
-- Documentación técnica exhaustiva en carpeta `docs/`
-- CHANGELOG.md agregado para seguimiento de versiones
-- Badges actualizados en READMEs
+### 📚 Documentation
+- README.md updated with playable puzzle examples
+- README.en.md synchronized with Spanish version
+- Comprehensive technical documentation in `docs/` folder
+- CHANGELOG.md added for version tracking
+- Updated badges in READMEs
 
 ---
 
 ## [1.0.0] - 2025-01-XX
 
-### 🎉 Añadido
-- **Generación completa de sudokus válidos 9x9**
-- **Método híbrido** Fisher-Yates + Backtracking
-  - Fase 1: Llenar diagonal principal con Fisher-Yates
-  - Fase 2: Completar resto con backtracking
-- **Funciones principales** (nombres en español en esta versión):
-  - `num_orden_fisher_yates()`: Permutación aleatoria
-  - `esSafePosicion()`: Validación de números
-  - `llenarDiagonal()`: Llenar subcuadrículas independientes
-  - `completarSudoku()`: Backtracking recursivo
-  - `verificarSudoku()`: Validación del tablero completo
-- **Interfaz de consola** con caracteres box-drawing
-- **Validación automática** del sudoku generado
-- **Documentación básica** en README.md
-- Licencia MIT
+### 🎉 Added
+- **Complete generation of valid 9x9 sudokus**
+- **Hybrid method** Fisher-Yates + Backtracking
+  - Phase 1: Fill main diagonal with Fisher-Yates
+  - Phase 2: Complete remainder with backtracking
+- **Main functions** (Spanish names in this version):
+  - `num_orden_fisher_yates()`: Random permutation
+  - `esSafePosicion()`: Number validation
+  - `llenarDiagonal()`: Fill independent subgrids
+  - `completarSudoku()`: Recursive backtracking
+  - `verificarSudoku()`: Complete board validation
+- **Console interface** with box-drawing characters
+- **Automatic validation** of generated sudoku
+- **Basic documentation** in README.md
+- MIT License
 
-### 📚 Documentación
-- README.md con explicación del algoritmo híbrido
-- Ejemplos de uso
-- Instrucciones de compilación
-- Roadmap inicial
+### 📚 Documentation
+- README.md with hybrid algorithm explanation
+- Usage examples
+- Compilation instructions
+- Initial roadmap
 
 ---
 
-## Tipos de Cambios
-- `🎉 Añadido`: Nuevas funcionalidades
-- `🔄 Cambiado`: Cambios en funcionalidades existentes
-- `🗑️ Removido`: Funcionalidades eliminadas
-- `🐛 Corregido`: Corrección de bugs
-- `🔒 Seguridad`: Correcciones de seguridad
-- `⚡ Optimizado`: Mejoras de performance
-- `📚 Documentación`: Cambios en documentación
-- `🌍 Internacionalización`: Cambios de idioma/localización
+## Change Types
+- `🎉 Added`: New features
+- `🔄 Changed`: Changes to existing features
+- `🗑️ Removed`: Removed features
+- `🐛 Fixed`: Bug fixes
+- `🔒 Security`: Security fixes
+- `⚡ Optimized`: Performance improvements
+- `📚 Documentation`: Documentation changes
+- `🌍 Internationalization`: Language/localization changes
 
 ---
 
 ## [Unreleased]
 
-### 🚧 En Progreso
-- Menú interactivo para elegir dificultad
-- Exportar puzzles a archivo .txt
-- Modo batch para generar múltiples puzzles
+### 🚧 In Progress
+- Interactive menu to choose difficulty
+- Export puzzles to .txt file
+- Batch mode to generate multiple puzzles
 
-### 💡 Planeado para v2.2
-- Parametrizar `PHASE3_TARGET` como argumento de función
-- Tests unitarios
-- Sistema de perfiles de dificultad predefinidos
-- Modo verbose/quiet para logs
-- Estructura modular con archivos .h y .c separados
+### 💡 Planned for v2.2
+- Parameterize `PHASE3_TARGET` as function argument
+- Unit tests
+- Predefined difficulty profile system
+- Verbose/quiet mode for logs
+- Modular structure with separate .h and .c files
 
-### 🔮 Ideas para v3.0
-- Solver automático con visualización paso a paso
-- GUI con ncurses
-- Modo interactivo para jugar
-- Generador de variantes (6x6, 12x12, Samurai)
-- API REST
-- Biblioteca compartida (.so/.dll)
-- Análisis de dificultad real (técnicas de solución requeridas)
+### 🔮 Ideas for v3.0
+- Automatic solver with step-by-step visualization
+- GUI with ncurses
+- Interactive playing mode
+- Variant generator (6x6, 12x12, Samurai)
+- REST API
+- Shared library (.so/.dll)
+- Real difficulty analysis (required solving techniques)
 
 ---
 
-**Nota**: Las fechas usan formato ISO 8601 (YYYY-MM-DD)
+**Note**: Dates use ISO 8601 format (YYYY-MM-DD)
 
 [2.1.0]: https://github.com/chaLords/sudoku_en_c/releases/tag/v2.1.0
 [2.0.0]: https://github.com/chaLords/sudoku_en_c/releases/tag/v2.0.0

@@ -52,7 +52,7 @@ Thumbs.db
 # Documentación en español (solo local, no subir a GitHub)
 docs/TECHNICAL.es.md
 docs/ALGORITHMS.es.md
-
+CHANGELOG.es.md
 # Directorios de build
 build/
 bin/
