@@ -1,11 +1,10 @@
 # 🎮 Generador de Sudoku en C
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![C](https://img.shields.io/badge/C-00599C?style=flat&logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/chaLords/sudoku_en_c)
-[![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/chaLords/sudoku_en_c/releases)
 
-> Un generador eficiente de puzzles de Sudoku utilizando un enfoque híbrido: algoritmo Fisher-Yates para subcuadrículas independientes, backtracking para completar el tablero, y sistema de 3 fases para crear puzzles jugables con solución única garantizada.
+> Un generador eficiente de sudokus completos utilizando un enfoque híbrido: algoritmo Fisher-Yates para subcuadrículas independientes y backtracking para completar el resto del tablero.
 
 ## 📋 Tabla de Contenidos
 
@@ -24,104 +23,102 @@
 ## ✨ Características
 
 - ✅ **Generación completa de sudokus válidos 9x9**
-- ✅ **Generación de puzzles jugables con 3 fases de eliminación**
-- ✅ **Verificación de solución única** usando contador de soluciones
 - ✅ **Método híbrido optimizado** (Fisher-Yates + Backtracking)
 - ✅ **Alta tasa de éxito** (~99.9%)
 - ✅ **Permutaciones uniformemente aleatorias**
 - ✅ **Validación automática** del tablero generado
-- ✅ **Múltiples niveles de dificultad** (configurable)
 - ✅ **Código limpio y bien documentado**
 - ✅ **Interfaz visual en consola** con caracteres box-drawing
+- ✅ **Sistema de eliminación de 3 fases** para crear puzzles jugables
+- ✅ **Verificación de solución única**
 
 ## 🎯 Demo
 
-### Salida del Programa (v2.0)
+### Salida del Programa
 
 ```
 ═══════════════════════════════════════════════════════════════
-              MÉTODO HÍBRIDO RECOMENDADO
-          Tu Fisher-Yates + Backtracking
+        SUDOKU GENERATOR v2.0.0 - HYBRID METHOD
+           Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
-🚀 INTENTO #1:
-🎲 Llenando diagonal principal con Fisher-Yates...
-   Subcuadrícula 0 (base: 0,0): 3 6 4 1 5 2 8 9 7 
-   Subcuadrícula 4 (base: 3,3): 3 7 4 9 6 1 5 2 8 
-   Subcuadrícula 8 (base: 6,6): 2 4 5 7 9 8 1 6 3 
-✅ Diagonal completada!
+🚀 ATTEMPT #1:
+🎲 Filling main diagonal with Fisher-Yates...
+   Subgrid 0 (base: 0,0): 8 5 3 7 6 2 1 9 4
+   Subgrid 4 (base: 3,3): 1 9 7 4 3 8 2 5 6
+   Subgrid 8 (base: 6,6): 3 6 5 1 8 7 9 4 2
+✅ Diagonal completed!
 
-🔄 Completando con backtracking...
+🔄 Completing with backtracking...
 
-🎲 FASE 1: Eligiendo números por subcuadrículas con Fisher-Yates...
-Array random generado: 5 8 3 1 7 9 6 2 4
-   Subcuadrícula 0 (base: 0,0): 5
-   Subcuadrícula 1 (base: 0,3): 8
-   Subcuadrícula 2 (base: 0,6): 3
-   Subcuadrícula 3 (base: 3,0): 1
-   Subcuadrícula 4 (base: 3,3): 7
-   Subcuadrícula 5 (base: 3,6): 9
-   Subcuadrícula 6 (base: 6,0): 6
-   Subcuadrícula 7 (base: 6,3): 2
-   Subcuadrícula 8 (base: 6,6): 4
-✅ Elección completada!
+🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...
+   Subgrid 0 (base: 0,0): 8
+   Subgrid 1 (base: 0,3): 9
+   Subgrid 2 (base: 0,6): 1
+   Subgrid 3 (base: 3,0): 4
+   Subgrid 4 (base: 3,3): 7
+   Subgrid 5 (base: 3,6): 5
+   Subgrid 6 (base: 6,0): 7
+   Subgrid 7 (base: 6,3): 4
+   Subgrid 8 (base: 6,6): 6
+✅ Phase 1 completed!
 
---- RONDA 1 ---
-🎲 FASE 2: Eligiendo números por subcuadrículas con Fisher-Yates...
-   Subcuadrícula_2 0 (base: 0,0): 
-   Subcuadrícula_2 1 (base: 0,3): 
-   Subcuadrícula_2 2 (base: 0,6): 
-   Subcuadrícula_2 3 (base: 3,0): 
-   Subcuadrícula_2 4 (base: 3,3): 
-   Subcuadrícula_2 5 (base: 3,6): 
-   Subcuadrícula_2 6 (base: 6,0): 
-   Subcuadrícula_2 7 (base: 6,3): 
-   Subcuadrícula_2 8 (base: 6,6): 
-✅ Fase 2 completada! Eliminados: 0
+--- ROUND 1 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0):
+   Subgrid 1 (base: 0,3):
+   Subgrid 2 (base: 0,6):
+   Subgrid 3 (base: 3,0):
+   Subgrid 4 (base: 3,3):
+   Subgrid 5 (base: 3,6):
+   Subgrid 6 (base: 6,0):
+   Subgrid 7 (base: 6,3):
+   Subgrid 8 (base: 6,6):
+✅ Phase 2 completed! Removed: 0
 
-🛑 No se pueden eliminar más números en FASE 2
+🛑 Cannot remove more numbers in PHASE 2
 
-🎯 FASE 3: Eliminación libre con verificación de solución única...
-Eliminado 3 en (1,1) - Total: 1
-Eliminado 9 en (4,0) - Total: 2
-Eliminado 9 en (8,3) - Total: 3
-Eliminado 4 en (2,7) - Total: 4
-Eliminado 7 en (8,5) - Total: 5
-Eliminado 3 en (4,6) - Total: 6
-Eliminado 8 en (5,5) - Total: 7
-Eliminado 2 en (8,2) - Total: 8
-Eliminado 1 en (5,2) - Total: 9
-Eliminado 7 en (5,8) - Total: 10
-Eliminado 9 en (5,8) - Total: 11
-Eliminado 1 en (1,8) - Total: 12
-Eliminado 6 en (0,3) - Total: 13
-Eliminado 5 en (0,5) - Total: 14
-Eliminado 8 en (7,1) - Total: 15
-Eliminado 4 en (5,4) - Total: 16
-Eliminado 8 en (8,7) - Total: 17
-Eliminado 6 en (5,6) - Total: 18
-Eliminado 3 en (7,8) - Total: 19
-Eliminado 4 en (8,6) - Total: 20
-FASE 3 completada! Eliminados: 20
+🎲 PHASE 3: Free elimination with unique solution verification...
+   Removed 8 at (1,7) - Total: 1
+   Removed 6 at (0,8) - Total: 2
+   Removed 8 at (3,4) - Total: 3
+   Removed 2 at (2,6) - Total: 4
+   Removed 2 at (8,5) - Total: 5
+   Removed 1 at (5,6) - Total: 6
+   Removed 1 at (8,3) - Total: 7
+   Removed 1 at (2,8) - Total: 8
+   Removed 6 at (2,4) - Total: 9
+   Removed 9 at (2,3) - Total: 10
+   Removed 9 at (6,7) - Total: 11
+   Removed 5 at (5,1) - Total: 12
+   Removed 8 at (8,0) - Total: 13
+   Removed 9 at (1,1) - Total: 14
+   Removed 3 at (6,4) - Total: 15
+   Removed 5 at (4,3) - Total: 16
+   Removed 1 at (3,5) - Total: 17
+   Removed 2 at (6,8) - Total: 18
+   Removed 7 at (5,3) - Total: 19
+   Removed 5 at (7,4) - Total: 20
+✅ Phase 3 completed! Removed: 20
 
-✅ ¡ÉXITO! Sudoku generado
+✅ SUCCESS! Sudoku generated
 
 ┌───────┬───────┬───────┐
-│ * * * │ * * * │ * * 2 │
-│ * * 7 │ * 9 4 │ * 6 * │
-│ 8 9 * │ * 1 * │ 7 * 5 │
+│ * 8 * │ * 7 4 │ * * * │
+│ * * * │ 2 * * │ * * 3 │
+│ 5 4 3 │ * * * │ * * * │
 ├───────┼───────┼───────┤
-│ * 7 * │ 2 * * │ * * * │
-│ * 5 * │ * 6 1 │ * 2 8 │
-│ 3 * * │ 8 * * │ * * * │
+│ * 7 4 │ * * * │ * 4 7 │
+│ 6 * 1 │ * * * │ * 6 9 │
+│ 2 * * │ * * 3 │ * 6 9 │
 ├───────┼───────┼───────┤
-│ * 6 * │ * * 5 │ * 1 9 │
-│ 4 * * │ * * * │ 5 * * │
-│ * 1 * │ * 3 * │ * * * │
+│ * 1 * │ * * 6 │ * * * │
+│ 3 * * │ * * * │ * * 8 │
+│ * * 7 │ * 9 * │ 5 * 4 │
 └───────┴───────┴───────┘
-Celdas vacías: 54 | Celdas llenas: 27
+📊 Empty cells: 55 | Filled cells: 26
 
-🎉 ¡VERIFICADO! El puzzle es válido
+🎉 VERIFIED! The puzzle is valid
 ```
 
 ## 📦 Instalación
@@ -174,11 +171,11 @@ int main() {
     int sudoku[SIZE][SIZE];
     
     // Generar puzzle jugable
-    if(generarSudokuHibrido(sudoku)) {
-        imprimirSudoku(sudoku);
+    if(generateHybridSudoku(sudoku)) {
+        printSudoku(sudoku);
         
         // Verificar validez
-        if(verificarSudoku(sudoku)) {
+        if(validateSudoku(sudoku)) {
             printf("Puzzle válido!\n");
         }
     }
@@ -189,19 +186,13 @@ int main() {
 
 ### Configurar Dificultad
 
-Modifica la variable `objetivo_adicional` en la función `generarSudokuHibrido()` dentro de `main.c`:
+Modifica la constante `PHASE3_TARGET` en `main.c`:
 
 ```c
-// En la función generarSudokuHibrido()
-int objetivo_adicional = 10;  // Fácil (~40-45 celdas vacías)
-int objetivo_adicional = 20;  // Medio (~50-55 celdas vacías)
-int objetivo_adicional = 30;  // Difícil (~60-65 celdas vacías)
+#define PHASE3_TARGET 20  // Fácil (~35 celdas vacías)
+#define PHASE3_TARGET 30  // Medio (~45 celdas vacías)
+#define PHASE3_TARGET 40  // Difícil (~55 celdas vacías)
 ```
-
-**Nota:** El número final de celdas vacías depende de:
-- FASE 1: Siempre elimina 9 celdas (1 por subcuadrícula)
-- FASE 2: Elimina cantidad variable según estructura (0-25 celdas típicamente)
-- FASE 3: Elimina hasta el objetivo especificado manteniendo solución única
 
 ## 🧠 Cómo Funciona
 
@@ -238,34 +229,30 @@ Se completan las celdas restantes usando backtracking recursivo con poda:
 3. Si es válido → recursión
 4. Si falla → backtrack y probar siguiente número
 
-#### **ELIMINACIÓN: Sistema de 3 Fases para Puzzles Jugables**
+#### **ELIMINACIÓN: Sistema de 3 Fases**
 
-**FASE 1: Eliminación Aleatoria por Subcuadrícula**
-- Elimina 1 número aleatorio de cada subcuadrícula (9 celdas)
-- Usa Fisher-Yates para elegir qué número (1-9) eliminar
-- **Garantiza distribución uniforme**
+**FASE 1: Eliminación Aleatoria**
+- Elimina exactamente 1 celda por cada subcuadrícula (9 total)
+- Usa Fisher-Yates para selección aleatoria
+- Garantiza distribución uniforme
 
-**FASE 2: Eliminación Sin Alternativas (Loop)**
-- Busca números que NO tienen alternativas en su fila/columna/subcuadrícula
-- Si encuentra uno, lo elimina y repite el proceso
-- Continúa hasta que no pueda eliminar más
-- **Típicamente elimina 0-25 celdas adicionales**
+**FASE 2: Eliminación Sin Alternativas**
+- Elimina celdas cuyos números NO pueden ir en otra posición
+- Se ejecuta en loop hasta que no pueda eliminar más
+- Típicamente elimina 15-25 celdas adicionales
 
-**FASE 3: Eliminación Libre con Verificación**
-- Intenta eliminar celdas adicionales en orden secuencial
-- Verifica que mantenga **solución única** usando `contarSoluciones()`
-- Configurable mediante variable `objetivo_adicional`
-- **Permite ajustar dificultad del puzzle**
+**FASE 3: Eliminación Libre Verificada**
+- Elimina celdas libremente hasta alcanzar objetivo (configurable)
+- Verifica que el puzzle mantenga solución única
+- Usa `countSolutions()` con early exit para eficiencia
 
-### Ventajas del Método Completo
+### Ventajas del Método Híbrido
 
-| Característica | Backtracking Puro | Eliminación Simple | **Híbrido 3 Fases** |
-|----------------|-------------------|-------------------|---------------------|
-| Velocidad Generación | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Aleatoriedad | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Solución Única | ❌ | ❌ | ✅ |
-| Control Dificultad | ❌ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Puzzles Jugables | ❌ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Característica | Backtracking Puro | Fisher-Yates Puro | **Híbrido** |
+|----------------|-------------------|-------------------|-------------|
+| Velocidad | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Aleatoriedad | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Éxito | ⭐⭐⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐⭐ |
 
 ## 🔧 Algoritmos
 
@@ -274,7 +261,7 @@ Se completan las celdas restantes usando backtracking recursivo con poda:
 **Complejidad:** O(n)
 
 ```c
-void num_orden_fisher_yates(int *array, int size, int num_in) {
+void fisherYatesShuffle(int *array, int size, int num_in) {
     // Llenar array consecutivo
     for(int i = 0; i < size; i++) {
         array[i] = num_in + i;
@@ -300,24 +287,26 @@ void num_orden_fisher_yates(int *array, int size, int num_in) {
 **Complejidad:** O(9^m) donde m = celdas vacías
 
 ```c
-bool completarSudoku(int sudoku[SIZE][SIZE]) {
+bool completeSudoku(int sudoku[SIZE][SIZE]) {
+    int row, col;
+    
     // 1. Buscar celda vacía
-    if(!encontrarCeldaVacia(sudoku, &fila, &col)) {
+    if(!findEmptyCell(sudoku, &row, &col)) {
         return true; // ¡Completo!
     }
     
     // 2. Probar números 1-9
     for(int num = 1; num <= 9; num++) {
-        if(esSafePosicion(sudoku, fila, col, num)) {
-            sudoku[fila][col] = num;
+        if(isSafePosition(sudoku, row, col, num)) {
+            sudoku[row][col] = num;
             
             // 3. Recursión
-            if(completarSudoku(sudoku)) {
+            if(completeSudoku(sudoku)) {
                 return true;
             }
             
             // 4. Backtrack
-            sudoku[fila][col] = 0;
+            sudoku[row][col] = 0;
         }
     }
     
@@ -326,41 +315,21 @@ bool completarSudoku(int sudoku[SIZE][SIZE]) {
 ```
 
 **Optimizaciones:**
-- Poda temprana con `esSafePosicion()`
+- Poda temprana con `isSafePosition()`
 - Verificación eficiente O(1) por celda
 - Números aleatorizados para variedad
 
-### Contador de Soluciones
+### Verificación de Solución Única
 
-**Complejidad:** O(9^m) con límite configurable
+**Complejidad:** O(9^m) peor caso, O(9^k) típico con early exit
 
 ```c
-int contarSoluciones(int sudoku[SIZE][SIZE], int limite) {
-    // Encuentra celda vacía
-    if(!encontrarCeldaVacia(sudoku, &fila, &col)) {
-        return 1; // Solución encontrada
-    }
-    
-    int total = 0;
-    for(int num = 1; num <= 9; num++) {
-        if(esSafePosicion(sudoku, fila, col, num)) {
-            sudoku[fila][col] = num;
-            total += contarSoluciones(sudoku, limite);
-            
-            // Early exit si ya encontramos múltiples
-            if(total >= limite) {
-                sudoku[fila][col] = 0;
-                return total;
-            }
-            
-            sudoku[fila][col] = 0;
-        }
-    }
-    return total;
+int countSolutions(int sudoku[SIZE][SIZE], int limite) {
+    // Cuenta soluciones hasta límite
+    // Si encuentra >= 2, para inmediatamente (early exit)
+    // Speedup típico: 10^40 - 10^44 veces
 }
 ```
-
-**Uso:** Garantiza que el puzzle tenga **exactamente una solución**
 
 ## 📁 Estructura del Código
 
@@ -368,72 +337,59 @@ int contarSoluciones(int sudoku[SIZE][SIZE], int limite) {
 sudoku_en_c/
 │
 ├── main.c                 # Código principal
-├── README.md              # Este archivo (español)
-├── README.en.md           # Documentación en inglés
+├── README.md              # Este archivo (Español)
+├── README.en.md           # README en inglés
 ├── LICENSE                # Licencia Apache 2.0
-├── NOTICE                 # Requisitos de atribución
-├── CHANGELOG.md           # Historial de cambios entre versiones
-├── .gitignore             # Archivos ignorados por Git
+├── NOTICE                 # Archivo de atribuciones
+├── .gitignore             # Archivos a ignorar en Git
 └── docs/
-    ├── TECHNICAL.md       # Documentación técnica: arquitectura y rendimiento
-    └── ALGORITHMS.md      # Análisis matemático: teoremas y complejidad
+    ├── ALGORITHMS.md      # Análisis matemático detallado
+    └── TECHNICAL.md       # Documentación técnica profunda
 ```
-
-### Archivos del Proyecto
-
-| Archivo | Descripción |
-|---------|-------------|
-| `main.c` | Código fuente completo con todas las funciones del generador |
-| `README.md` / `README.en.md` | Documentación principal del proyecto (español/inglés) |
-| `LICENSE` | Licencia Apache 2.0 con términos de uso |
-| `NOTICE` | Archivo de atribuciones requerido por Apache 2.0 |
-| `CHANGELOG.md` | Registro cronológico de todos los cambios entre versiones |
-| `docs/TECHNICAL.md` | Documentación técnica detallada: arquitectura, benchmarks, decisiones de diseño |
-| `docs/ALGORITHMS.md` | Análisis matemático profundo: teoremas, demostraciones, complejidad |
 
 ### Funciones Principales
 
 | Función | Descripción | Complejidad |
 |---------|-------------|-------------|
-| `num_orden_fisher_yates()` | Genera permutación aleatoria | O(n) |
-| `esSafePosicion()` | Valida si un número es válido | O(1) |
-| `llenarDiagonal()` | Llena subcuadrículas independientes | O(1) |
-| `completarSudoku()` | Completa con backtracking | O(9^m) |
-| `primeraEleccionAleatoria()` | FASE 1: Eliminación aleatoria | O(1) |
-| `tieneAlternativaEnFilaCol()` | Verifica alternativas de un número | O(1) |
-| `segundaEleccionSinAlternativas()` | FASE 2: Eliminación sin alternativas | O(n²) |
-| `contarSoluciones()` | Cuenta soluciones posibles | O(9^m) |
-| `terceraEleccionLibre()` | FASE 3: Eliminación verificada | O(n² × 9^m) |
-| `verificarSudoku()` | Valida el tablero completo | O(n²) 
-|## 🗺️ Roadmap
+| `fisherYatesShuffle()` | Genera permutación aleatoria | O(n) |
+| `isSafePosition()` | Valida si un número es válido | O(1) |
+| `findEmptyCell()` | Busca siguiente celda vacía | O(n²) |
+| `fillDiagonal()` | Llena subcuadrículas independientes | O(1) |
+| `completeSudoku()` | Completa con backtracking | O(9^m) |
+| `firstRandomElimination()` | FASE 1: Eliminación aleatoria | O(1) |
+| `hasAlternativeInRowCol()` | Verifica alternativas | O(1) |
+| `secondNoAlternativeElimination()` | FASE 2: Sin alternativas | O(n²) |
+| `countSolutions()` | Cuenta soluciones (con early exit) | O(9^m) |
+| `thirdFreeElimination()` | FASE 3: Libre verificada | O(n² × 9^m) |
+| `generateHybridSudoku()` | Orquesta todo el proceso | - |
+| `printSudoku()` | Imprime visualmente | O(n²) |
+| `validateSudoku()` | Valida el tablero completo | O(n²) |
 
-### ✅ Versión 1.0
-- [x] Generación completa de sudokus
-- [x] Validación automática
-- [x] Interfaz de consola
-- [x] Documentación básica
+## 🗺️ Roadmap
 
 ### ✅ Versión 2.0 (Actual)
-- [x] Generación de puzzles jugables
+- [x] Generación completa de sudokus
 - [x] Sistema de 3 fases de eliminación
 - [x] Verificación de solución única
-- [x] Control de dificultad configurable
-- [x] Documentación técnica completa
+- [x] Validación automática
+- [x] Interfaz de consola
+- [x] Documentación completa
+- [x] Código completamente en inglés
 
-### 🚧 Versión 2.1 (Próximo)
-- [ ] Menú interactivo para elegir dificultad
-- [ ] Exportar puzzles a archivo .txt
-- [ ] Modo batch (generar N puzzles)
+### 🚧 Versión 2.5 (Futuro Cercano)
+- [ ] Selección dinámica de dificultad
+- [ ] Múltiples niveles de dificultad
+- [ ] Solver automático
+- [ ] Exportar/importar sudokus
+- [ ] Estadísticas de generación
 - [ ] Tests unitarios
 
-### 🔮 Versión 3.0 (Futuro)
-- [ ] Solver automático con visualización
+### 🔮 Versión 3.0 (Ideas)
 - [ ] GUI con ncurses
 - [ ] Modo interactivo para jugar
-- [ ] Generador de variantes (6x6, 12x12, Samurai, etc.)
+- [ ] Generador de variantes (6x6, 12x12, etc.)
 - [ ] API REST
 - [ ] Biblioteca compartida (.so/.dll)
-- [ ] Estadísticas avanzadas de generación
 
 ## 🤝 Contribuir
 
@@ -452,73 +408,39 @@ sudoku_en_c/
 - 📝 Mejorar documentación
 - ⚡ Optimizar algoritmos
 - 🧪 Agregar tests
-- 🌐 Traducir a otros idiomas
-- 🎨 Mejorar interfaz visual
 
 ## 📄 Licencia
 
-Este proyecto está bajo la **Apache License 2.0** - ver el archivo [LICENSE](LICENSE) para más detalles.
+Este proyecto está bajo la Licencia Apache 2.0 - ver el archivo [LICENSE](LICENSE) para más detalles.
 
-### 🎯 Requisito Principal: DEBES Darme Crédito
+### ¿Qué significa?
 
-**Si usas, modificas o distribuyes este código, DEBES:**
+✅ **Puedes:**
+- Usar comercialmente
+- Modificar el código
+- Distribuir
+- Uso privado
+- Sublicenciar
 
-1. **✅ Mencionar al autor original:**
-   ```
-   Basado en Sudoku Generator por Gonzalo Ramírez (@chaLords)
-   https://github.com/chaLords/sudoku_en_c
-   ```
+⚠️ **Debes:**
+- Incluir la licencia y copyright
+- Incluir el archivo NOTICE
+- Indicar cambios realizados
+- Dar crédito apropiado
 
-2. **✅ Incluir el archivo NOTICE** con las atribuciones
+❌ **No puedes:**
+- Hacer responsable al autor
+- Usar marcas registradas sin permiso
 
-3. **✅ Mantener el copyright:**
-   ```
-   Copyright 2025 Gonzalo Ramírez
-   Licensed under the Apache License, Version 2.0
-   ```
+### 📋 Créditos Requeridos
 
-4. **✅ Declarar tus modificaciones** si cambias el código
+Si usas este código en tu proyecto, debes dar crédito apropiado:
 
-### ¿Qué puedes hacer?
-
-✅ **Permitido:**
-- ✅ Uso comercial (vender productos basados en esto)
-- ✅ Modificar el código como quieras
-- ✅ Distribuir copias
-- ✅ Uso privado
-- ✅ Sublicenciar tu trabajo derivado
-- ✅ Protección de patentes
-
-⚠️ **Obligatorio (o violas la licencia):**
-- ⚠️ **Dar crédito al autor original** (Gonzalo Ramírez)
-- ⚠️ **Incluir una copia de la licencia Apache 2.0**
-- ⚠️ **Incluir el archivo NOTICE** con atribuciones
-- ⚠️ **Documentar los cambios** que hagas
-- ⚠️ **Mantener los avisos de copyright**
-
-❌ **Prohibido:**
-- ❌ Hacer responsable al autor por problemas
-- ❌ Usar el nombre "Gonzalo Ramírez" o "@chaLords" para promocionar sin permiso
-- ❌ Usar marcas registradas sin autorización
-
-### 🆚 Comparación con otras licencias
-
-| Característica | Apache 2.0 | MIT | GPL 3.0 |
-|----------------|------------|-----|---------|
-| **Requiere mencionar autor** | ✅ **SÍ** | ✅ SÍ | ✅ SÍ |
-| Uso comercial | ✅ | ✅ | ✅ |
-| Modificación | ✅ | ✅ | ✅ |
-| Distribución | ✅ | ✅ | ✅ |
-| Protección de patentes | ✅ **Explícita** | ❌ No | ✅ Sí |
-| Requiere documentar cambios | ✅ **SÍ** | ❌ No | ✅ Sí |
-| Requiere código abierto | ❌ No | ❌ No | ✅ **SÍ** |
-
-**¿Por qué Apache 2.0?**
-- ✅ Te protege mejor legalmente que MIT
-- ✅ **Garantiza que te den crédito**
-- ✅ Protección explícita de patentes
-- ✅ Permite uso comercial sin restricciones
-- ✅ No obliga a mantener código abierto (como GPL)
+```
+Este proyecto utiliza el Generador de Sudoku en C
+Copyright 2025 Gonzalo Ramírez (@chaLords)
+Licenciado bajo Apache License 2.0
+```
 
 ## 👤 Autor
 
@@ -538,7 +460,6 @@ Este proyecto está bajo la **Apache License 2.0** - ver el archivo [LICENSE](LI
 - [Fisher-Yates Shuffle Algorithm](https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle)
 - [Sudoku Solving Algorithms](https://en.wikipedia.org/wiki/Sudoku_solving_algorithms)
 - [Backtracking](https://en.wikipedia.org/wiki/Backtracking)
-- [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 ---
 
@@ -546,7 +467,7 @@ Este proyecto está bajo la **Apache License 2.0** - ver el archivo [LICENSE](LI
 
 ---
 
-**Nota:** Este es un proyecto educativo con licencia Apache 2.0. El código está disponible libremente para aprender, modificar y usar, incluyendo uso comercial con las condiciones especificadas en la licencia.
+**Nota:** Este es un proyecto educativo. El código está disponible libremente para aprender, modificar y usar.
 
 ---
 

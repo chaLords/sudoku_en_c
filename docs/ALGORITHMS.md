@@ -1,65 +1,65 @@
-# Análisis de Algoritmos - Generador de Sudoku
+# Algorithm Analysis - Sudoku Generator
 
-## Tabla de Contenidos
-1. [Resumen Ejecutivo](#resumen-ejecutivo)
-2. [Algoritmo Fisher-Yates](#algoritmo-fisher-yates)
-3. [Algoritmo de Backtracking](#algoritmo-de-backtracking)
-4. [Sistema de Eliminación de 3 Fases](#sistema-de-eliminación-de-3-fases)
-5. [Verificación de Solución Única](#verificación-de-solución-única)
-6. [Análisis de Complejidad Completo](#análisis-de-complejidad-completo)
-7. [Fundamentos Matemáticos](#fundamentos-matemáticos)
+## Table of Contents
+1. [Executive Summary](#executive-summary)
+2. [Fisher-Yates Algorithm](#fisher-yates-algorithm)
+3. [Backtracking Algorithm](#backtracking-algorithm)
+4. [3-Phase Elimination System](#3-phase-elimination-system)
+5. [Unique Solution Verification](#unique-solution-verification)
+6. [Complete Complexity Analysis](#complete-complexity-analysis)
+7. [Mathematical Foundations](#mathematical-foundations)
 
 ---
 
-## Resumen Ejecutivo
+## Executive Summary
 
-Este documento analiza matemáticamente los algoritmos del generador de Sudoku, explicando **por qué funcionan** y **cuál es su rendimiento**.
+This document mathematically analyzes the Sudoku generator algorithms, explaining **why they work** and **their performance characteristics**.
 
-### Pipeline Completo
+### Complete Pipeline
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  GENERACIÓN (Fase A)                    │
-│  Fisher-Yates (diagonal) + Backtracking (resto)         │
-│  Complejidad: O(1) + O(9^m) ≈ O(9^m)                    │
-│  Tiempo típico: ~2ms                                    │
+│                  GENERATION (Phase A)                   │
+│  Fisher-Yates (diagonal) + Backtracking (rest)          │
+│  Complexity: O(1) + O(9^m) ≈ O(9^m)                     │
+│  Typical time: ~2ms                                     │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│              ELIMINACIÓN (Fases 1, 2, 3)                │
-│  1. Aleatoria (9 celdas) - O(1)                         │
-│  2. Sin alternativas (15-25 celdas) - O(n²)             │
-│  3. Libre verificada (configurable) - O(n² × 9^m)       │
-│  Tiempo típico: ~100ms (dominado por Fase 3)            │
+│              ELIMINATION (Phases 1, 2, 3)               │
+│  1. Random elimination (9 cells) - O(1)                 │
+│  2. No-alternatives elimination (0-25 cells) - O(n²)    │
+│  3. Verified free elimination (configurable) - O(n²×9^m)│
+│  Typical time: ~100ms (dominated by Phase 3)            │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│                   PUZZLE JUGABLE                        │
-│  Total: 50-54 celdas vacías                             │
-│  Solución única garantizada                             │
+│                   PLAYABLE PUZZLE                       │
+│  Total: 30-54 empty cells                               │
+│  Unique solution guaranteed                             │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Algoritmo Fisher-Yates
+## Fisher-Yates Algorithm
 
-### Descripción
+### Description
 
-Genera una permutación uniformemente aleatoria de los números 1-9.
+Generates a uniformly random permutation of numbers 1-9.
 
-### Implementación
+### Implementation
 
 ```c
-void num_orden_fisher_yates(int *array, int size, int num_in) {
-    // Paso 1: Llenar consecutivo
+void fisherYatesShuffle(int *array, int size, int num_in) {
+    // Step 1: Fill consecutively
     for(int i = 0; i < size; i++) {
         array[i] = num_in + i;
     }
     
-    // Paso 2: Mezclar (Fisher-Yates)
+    // Step 2: Shuffle (Fisher-Yates)
     for(int i = size-1; i > 0; i--) {
         int j = rand() % (i + 1);
         int temp = array[i];
@@ -69,81 +69,81 @@ void num_orden_fisher_yates(int *array, int size, int num_in) {
 }
 ```
 
-### Análisis de Complejidad
+### Complexity Analysis
 
-| Operación | Complejidad | Justificación |
-|-----------|-------------|---------------|
-| Llenar array | O(n) | Un loop de n iteraciones |
-| Mezclar | O(n) | Un loop de n-1 iteraciones |
+| Operation | Complexity | Justification |
+|-----------|------------|---------------|
+| Fill array | O(n) | One loop of n iterations |
+| Shuffle | O(n) | One loop of n-1 iterations |
 | **Total** | **O(n)** | O(n) + O(n) = O(n) |
 
-Para n = 9: **O(9) = O(1)** (constante)
+For n = 9: **O(9) = O(1)** (constant)
 
-### ¿Por qué funciona?
+### Why Does It Work?
 
-**Teorema**: El algoritmo Fisher-Yates genera todas las n! permutaciones con **igual probabilidad**.
+**Theorem**: The Fisher-Yates algorithm generates all n! permutations with **equal probability**.
 
-**Demostración** (por inducción):
+**Proof** (by induction):
 
-**Base**: Para n=1, hay 1 permutación, probabilidad = 1 ✓
+**Base case**: For n=1, there is 1 permutation, probability = 1 ✓
 
-**Paso inductivo**: Supongamos válido para n-1.
+**Inductive step**: Assume valid for n-1.
 
-Para n elementos:
-- El último elemento tiene probabilidad 1/n de ir a cualquier posición
-- Los n-1 restantes se permutan con probabilidad 1/(n-1)!
-- Probabilidad total = (1/n) × (1/(n-1)!) = 1/n!
+For n elements:
+- The last element has probability 1/n of going to any position
+- The remaining n-1 are permuted with probability 1/(n-1)!
+- Total probability = (1/n) × (1/(n-1)!) = 1/n!
 
-### Propiedades Matemáticas
+### Mathematical Properties
 
-1. **Uniformidad**: P(permutación i) = 1/n! para toda permutación i
-2. **Tiempo lineal**: Más eficiente que métodos de ordenamiento (O(n log n))
-3. **In-place**: No requiere memoria adicional
-4. **Determinístico**: Mismo seed → misma secuencia
+1. **Uniformity**: P(permutation i) = 1/n! for all permutations i
+2. **Linear time**: More efficient than sorting methods (O(n log n))
+3. **In-place**: No additional memory required
+4. **Deterministic**: Same seed → same sequence
 
 ---
 
-## Algoritmo de Backtracking
+## Backtracking Algorithm
 
-### Descripción
+### Description
 
-Completa el Sudoku usando búsqueda exhaustiva con poda (constraint satisfaction).
+Completes the Sudoku using exhaustive search with pruning (constraint satisfaction).
 
-### Implementación
+### Implementation
 
 ```c
-bool completarSudoku(int sudoku[SIZE][SIZE]) {
-    int fila, col;
+bool completeSudoku(int sudoku[SIZE][SIZE]) {
+    int row, col;
     
-    // Base: ¿Completado?
-    if(!encontrarCeldaVacia(sudoku, &fila, &col)) {
+    // Base: Complete?
+    if(!findEmptyCell(sudoku, &row, &col)) {
         return true;
     }
     
-    // Generar números aleatorios para variedad
-    int numeros[9] = {1,2,3,4,5,6,7,8,9};
+    // Generate random numbers for variety
+    int numbers[9] = {1,2,3,4,5,6,7,8,9};
     for(int i = 8; i > 0; i--) {
         int j = rand() % (i + 1);
-        int temp = numeros[i];
-        numeros[i] = numeros[j];
-        numeros[j] = temp;
+        int temp = numbers[i];
+        numbers[i] = numbers[j];
+        numbers[j] = temp;
     }
     
-    // Probar cada número
+    // Try each number
     for(int i = 0; i < 9; i++) {
-        int num = numeros[i];
+        int num = numbers[i];
         
-        // Poda: ¿Es válido?
-        if(esSafePosicion(sudoku, fila, col, num)) {
-            sudoku[fila][col] = num;
+        // Prune: Is it valid?
+        if(isSafePosition(sudoku, row, col, num)) {
+            sudoku[row][col] = num;
             
-            // Recursión
-            if(completarSudoku(sudoku)) {
+            // Recurse
+            if(completeSudoku(sudoku)) {
                 return true;
             }
             
             // Backtrack
-            sudoku[fila][col] = 0;
+            sudoku[row][col] = 0;
         }
     }
     
@@ -151,415 +151,458 @@ bool completarSudoku(int sudoku[SIZE][SIZE]) {
 }
 ```
 
-### Análisis de Complejidad
+### Complexity Analysis
 
-**Peor caso**: O(9^m) donde m = celdas vacías
+**Worst case**: O(9^m) where m = empty cells
 
-**Explicación**:
-- Cada celda vacía tiene hasta 9 opciones
-- Con m celdas vacías: 9 × 9 × 9 × ... (m veces) = 9^m
+**Explanation**:
+- Each empty cell has up to 9 options
+- With m empty cells: 9 × 9 × 9 × ... (m times) = 9^m
 
-**En la práctica**:
-- Con diagonal llena: m ≈ 54 celdas vacías
-- Poda reduce drásticamente el espacio de búsqueda
-- Tiempo típico: ~1-2ms (mucho mejor que el peor caso)
+**In practice**:
+- With filled diagonal: m ≈ 54 empty cells
+- Pruning drastically reduces search space
+- Typical time: ~1-2ms (much better than worst case)
 
-### Optimizaciones Implementadas
+### Implemented Optimizations
 
-1. **Poda temprana**: `esSafePosicion()` elimina ramas inválidas
-2. **Orden aleatorio**: Evita patrones predecibles
-3. **Diagonal pre-llenada**: Reduce m de 81 a ~54
+1. **Early pruning**: `isSafePosition()` eliminates invalid branches
+2. **Random order**: Avoids predictable patterns
+3. **Pre-filled diagonal**: Reduces m from 81 to ~54
 
-### ¿Por qué funciona?
+### Why Does It Work?
 
-**Teorema**: El backtracking con constraint checking encuentra una solución si existe.
+**Theorem**: Backtracking with constraint checking finds a solution if one exists.
 
-**Demostración**:
-1. El espacio de búsqueda incluye todas las configuraciones posibles
-2. Las podas solo eliminan configuraciones inválidas
-3. Si hay solución, el algoritmo la encontrará (completitud)
-4. Si no hay solución, el algoritmo lo detectará (correctitud)
+**Proof**:
+1. The search space includes all possible configurations
+2. Pruning only eliminates invalid configurations
+3. If a solution exists, the algorithm will find it (completeness)
+4. If no solution exists, the algorithm will detect it (correctness)
 
 ---
 
-## Sistema de Eliminación de 3 Fases
+## 3-Phase Elimination System
 
-### Visión General
+### Overview
 
 ```
-SUDOKU COMPLETO (81 celdas llenas)
+COMPLETE SUDOKU (81 filled cells)
         │
-        ├─► FASE 1: Eliminación Aleatoria
-        │   └─ 9 celdas eliminadas (1 por subcuadrícula)
+        ├─► PHASE 1: Random Elimination
+        │   └─ 9 cells removed (1 per subgrid)
         │
-        ├─► FASE 2: Eliminación Sin Alternativas
-        │   └─ 15-25 celdas eliminadas (estructura-dependiente)
+        ├─► PHASE 2: No-Alternatives Elimination
+        │   └─ 0-25 cells removed (structure-dependent)
         │
-        └─► FASE 3: Eliminación Libre Verificada
-            └─ 0-20 celdas eliminadas (configurable)
+        └─► PHASE 3: Verified Free Elimination
+            └─ 0-20 cells removed (configurable)
                 │
                 ▼
-        PUZZLE JUGABLE (50-54 celdas vacías)
+        PLAYABLE PUZZLE (30-54 empty cells)
 ```
 
-### FASE 1: Eliminación Aleatoria
+### PHASE 1: Random Elimination
 
-#### Algoritmo
+#### Algorithm
 
 ```c
-int primeraEleccionAleatoria(int sudoku[SIZE][SIZE]) {
-    int eliminados = 0;
+void firstRandomElimination(int sudoku[SIZE][SIZE]) {
+    int subgrid[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    int random[SIZE];
+    fisherYatesShuffle(random, SIZE, 1);
     
-    // Para cada subcuadrícula
-    for(int cuadricula = 0; cuadricula < SIZE; cuadricula++) {
-        int fila_base = (cuadricula / 3) * 3;
-        int col_base = (cuadricula % 3) * 3;
+    // For each subgrid
+    for(int idx = 0; idx < 9; idx++) {
+        int grid = subgrid[idx];
+        int initial_row = (grid/3) * 3;
+        int initial_column = (grid%3) * 3;
         
-        // Elegir posición aleatoria
-        int pos_random = rand() % SIZE;
-        int fila = fila_base + (pos_random / 3);
-        int col = col_base + (pos_random % 3);
+        int valueToRemove = random[idx];
         
-        // Eliminar
-        sudoku[fila][col] = 0;
-        eliminados++;
+        // Find and remove that value in the subgrid
+        // ...
     }
-    
-    return eliminados;
 }
 ```
 
-#### Análisis
+#### Analysis
 
-| Propiedad | Valor |
-|-----------|-------|
-| Complejidad | O(9) = O(1) |
-| Celdas eliminadas | Exactamente 9 |
-| Garantía | 1 por subcuadrícula |
+| Property | Value |
+|----------|-------|
+| Complexity | O(9) = O(1) |
+| Cells removed | Exactly 9 |
+| Guarantee | 1 per subgrid |
 
-**Invariante**: Después de FASE 1, cada subcuadrícula tiene exactamente 8 números.
+**Invariant**: After PHASE 1, each subgrid has exactly 8 numbers.
 
-### FASE 2: Eliminación Sin Alternativas
+### PHASE 2: No-Alternatives Elimination
 
-#### Algoritmo
+#### Concept
+
+A number has no alternatives in its row/column/subgrid if it cannot be placed in any other empty cell of those groups.
+
+#### Implementation
 
 ```c
-int segundaEleccionSinAlternativas(int sudoku[SIZE][SIZE]) {
-    int eliminados = 0;
+int secondNoAlternativeElimination(int sudoku[SIZE][SIZE]) {
+    int subgrid[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    int removed = 0;
     
-    for(int cuadricula = 0; cuadricula < SIZE; cuadricula++) {
-        int fila_base = (cuadricula / 3) * 3;
-        int col_base = (cuadricula % 3) * 3;
+    for(int idx = 0; idx < 9; idx++) {
+        int grid = subgrid[idx];
+        // ... calculate positions ...
         
-        // Buscar en toda la subcuadrícula
-        for(int i = 0; i < 3; i++) {
-            for(int j = 0; j < 3; j++) {
-                int fila = fila_base + i;
-                int col = col_base + j;
+        for(int i = 0; i < SIZE; i++) {
+            int row = initial_row + (i/3);
+            int col = initial_column + (i%3);
+            
+            if(sudoku[row][col] != 0) {
+                int currentNumber = sudoku[row][col];
                 
-                if(sudoku[fila][col] != 0) {
-                    int num = sudoku[fila][col];
-                    
-                    // Verificar si no tiene alternativa
-                    if(!tieneAlternativaEnFilaCol(sudoku, fila, col, num)) {
-                        sudoku[fila][col] = 0;
-                        eliminados++;
-                        break; // Máximo 1 por subcuadrícula
-                    }
+                if(!hasAlternativeInRowCol(sudoku, row, col, currentNumber)) {
+                    sudoku[row][col] = 0;
+                    removed++;
+                    break; // Max 1 per subgrid
                 }
             }
-            if(eliminados > (cuadricula + 1 - 9)) break;
         }
     }
     
-    return eliminados;
+    return removed;
 }
 ```
 
-#### Función Auxiliar: `tieneAlternativaEnFilaCol()`
+#### Helper Function: `hasAlternativeInRowCol()`
 
 ```c
-bool tieneAlternativaEnFilaCol(int sudoku[SIZE][SIZE], int fila, int col, int num) {
-    // Verificar fila
+bool hasAlternativeInRowCol(int sudoku[SIZE][SIZE], int row, int col, int num) {
+    int temp = sudoku[row][col];
+    sudoku[row][col] = 0;
+    
+    int possibleInRow = 0;
+    int possibleInCol = 0;
+    int possibleInSubgrid = 0;
+    
+    // Check row
+    for(int x = 0; x < SIZE; x++) {
+        if(x != col && sudoku[row][x] == 0) {
+            if(isSafePosition(sudoku, row, x, num)) {
+                possibleInRow++;
+            }
+        }
+    }
+    
+    // Check column
+    for(int x = 0; x < SIZE; x++) {
+        if(x != row && sudoku[x][col] == 0) {
+            if(isSafePosition(sudoku, x, col, num)) {
+                possibleInCol++;
+            }
+        }
+    }
+    
+    // Check subgrid (similar logic)
+    // ...
+    
+    sudoku[row][col] = temp; // Restore
+    
+    return (possibleInRow > 0) || (possibleInCol > 0) || (possibleInSubgrid > 0);
+}
+```
+
+#### Analysis
+
+| Operation | Complexity | Justification |
+|-----------|------------|---------------|
+| Main loop | O(9 × 9) = O(81) | 9 subgrids × 9 cells |
+| `hasAlternativeInRowCol()` | O(9 + 9) = O(18) = O(1) | Check row and column |
+| `isSafePosition()` | O(1) | Constant verification |
+| **Total per round** | **O(81) = O(n²)** | n = 9 |
+
+**Cells removed**: Variable, typically 0-25 (structure-dependent)
+
+**Removal condition**: The number CANNOT be placed in another empty cell of its row, column, or subgrid.
+
+#### Loop Structure
+
+```c
+int round = 1;
+int removed;
+do {
+    removed = secondNoAlternativeElimination(sudoku);
+    round++;
+} while(removed > 0);
+```
+
+**Why loop?** Removing a number can create new opportunities. A number with alternatives in round 1 may have none in round 2.
+
+### PHASE 3: Verified Free Elimination
+
+#### Goal
+
+Remove additional numbers until reaching difficulty target, guaranteeing unique solution.
+
+#### Detailed Algorithm
+
+**Step 1: Collect all positions with numbers**
+```c
+typedef struct {
+    int row;
+    int col;
+} Position;
+
+Position positions[81];
+int count = 0;
+
+for(int f = 0; f < SIZE; f++) {
     for(int c = 0; c < SIZE; c++) {
-        if(c != col && sudoku[fila][c] == 0) {
-            if(esSafePosicion(sudoku, fila, c, num)) {
-                return true; // Hay alternativa
-            }
+        if(sudoku[f][c] != 0) {
+            positions[count].row = f;
+            positions[count].col = c;
+            count++;
         }
     }
-    
-    // Verificar columna
-    for(int f = 0; f < SIZE; f++) {
-        if(f != fila && sudoku[f][col] == 0) {
-            if(esSafePosicion(sudoku, f, col, num)) {
-                return true; // Hay alternativa
-            }
-        }
-    }
-    
-    return false; // No hay alternativa
 }
 ```
 
-#### Análisis
-
-| Operación | Complejidad | Justificación |
-|-----------|-------------|---------------|
-| Loop principal | O(9 × 9) = O(81) | 9 subcuadrículas × 9 celdas |
-| `tieneAlternativaEnFilaCol()` | O(9 + 9) = O(18) = O(1) | Verificar fila y columna |
-| `esSafePosicion()` | O(1) | Verificación constante |
-| **Total por ronda** | **O(81) = O(n²)** | n = 9 |
-
-**Celdas eliminadas**: Variable, típicamente 15-25 (depende de la estructura)
-
-**Condición de eliminación**: El número NO puede ubicarse en otra celda vacía de su fila o columna.
-
-### FASE 3: Eliminación Libre Verificada
-
-#### Algoritmo
-
+**Step 2: Shuffle positions randomly**
 ```c
-int terceraEleccionLibre(int sudoku[SIZE][SIZE], int objetivo_adicional) {
-    int eliminados = 0;
-    int max_intentos = 100;
-    int intentos = 0;
-    
-    while(eliminados < objetivo_adicional && intentos < max_intentos) {
-        bool elimino_algo = false;
-        
-        // Recorrer TODO el tablero
-        for(int fila = 0; fila < SIZE && eliminados < objetivo_adicional; fila++) {
-            for(int col = 0; col < SIZE && eliminados < objetivo_adicional; col++) {
-                
-                if(sudoku[fila][col] != 0) {
-                    int num_actual = sudoku[fila][col];
-                    sudoku[fila][col] = 0; // Eliminar temporalmente
-                    
-                    // Verificar solución única
-                    if(contarSoluciones(sudoku, 2) == 1) {
-                        eliminados++;
-                        elimino_algo = true;
-                    } else {
-                        sudoku[fila][col] = num_actual; // Restaurar
-                    }
-                }
-            }
-        }
-        
-        if(!elimino_algo) break;
-        intentos++;
-    }
-    
-    return eliminados;
+// Fisher-Yates on positions array
+for(int i = count-1; i > 0; i--) {
+    int j = rand() % (i + 1);
+    Position temp = positions[i];
+    positions[i] = positions[j];
+    positions[j] = temp;
 }
 ```
 
-#### Parámetro de Configuración
-
-En la función `generarSudokuHibrido()`, puedes modificar la variable local:
-
+**Step 3: Try to remove in random order**
 ```c
-// Dentro de generarSudokuHibrido()
-int objetivo_adicional = 20;  // Fácil (~35 celdas vacías)
-int objetivo_adicional = 30;  // Medio (~45 celdas vacías)
-int objetivo_adicional = 40;  // Difícil (~55 celdas vacías)
+int removed = 0;
+int target = PHASE3_TARGET;  // Configurable
+
+for(int i = 0; i < count && removed < target; i++) {
+    int row = positions[i].row;
+    int col = positions[i].col;
+    
+    int temp = sudoku[row][col];  // Save
+    sudoku[row][col] = 0;         // Remove temporarily
+    
+    int solutions = countSolutions(sudoku, 2);
+    
+    if(solutions == 1) {
+        // ✓ Unique solution maintained
+        removed++;
+    } else {
+        // ✗ 0 or multiple solutions
+        sudoku[row][col] = temp;  // Restore
+    }
+}
 ```
 
-**Nota**: A diferencia de versiones anteriores que usaban `#define OBJETIVO_FASE3`, ahora se usa una variable local para mayor flexibilidad.
+#### Configuration Parameter
 
-#### Análisis
+In `main.c`, modify the constant:
 
-| Operación | Complejidad |
-|-----------|-------------|
-| Loop principal | O(n² × objetivo) |
-| `contarSoluciones()` | O(9^m) peor caso |
-| **Total por ronda** | **O(n² × 9^m)** |
+```c
+#define PHASE3_TARGET 20  // Easy (~35 empty cells)
+#define PHASE3_TARGET 30  // Medium (~45 empty cells)
+#define PHASE3_TARGET 40  // Hard (~55 empty cells)
+```
 
-**En la práctica**:
-- `contarSoluciones()` usa early exit (límite = 2)
-- Complejidad efectiva: mucho menor que el peor caso
-- Tiempo típico: ~100ms (97% del tiempo total)
+#### Analysis
+
+| Operation | Complexity |
+|-----------|------------|
+| Main loop | O(n² × target) |
+| `countSolutions()` | O(9^m) worst case |
+| **Total per round** | **O(n² × 9^m)** |
+
+**In practice**:
+- `countSolutions()` uses early exit (limit = 2)
+- Effective complexity: much lower than worst case
+- Typical time: ~100ms (97% of total time)
 
 ---
 
-## Verificación de Solución Única
+## Unique Solution Verification
 
-### Función `contarSoluciones()`
+### Function `countSolutions()`
 
 ```c
-int contarSoluciones(int sudoku[SIZE][SIZE], int limite) {
-    int fila, col;
+int countSolutions(int sudoku[SIZE][SIZE], int limite) {
+    int row, col;
     
-    // Base: ¿Completado?
-    if(!encontrarCeldaVacia(sudoku, &fila, &col)) {
-        return 1; // Una solución encontrada
+    // Base: Complete?
+    if(!findEmptyCell(sudoku, &row, &col)) {
+        return 1; // One solution found
     }
     
-    int contador = 0;
+    int totalSolutions = 0;
     
-    // Probar números 1-9
+    // Try numbers 1-9
     for(int num = 1; num <= 9; num++) {
-        if(esSafePosicion(sudoku, fila, col, num)) {
-            sudoku[fila][col] = num;
+        if(isSafePosition(sudoku, row, col, num)) {
+            sudoku[row][col] = num;
             
-            // Recursión
-            contador += contarSoluciones(sudoku, limite);
+            // Recurse
+            totalSolutions += countSolutions(sudoku, limite);
             
-            // Early exit: Si ya encontramos 2+, parar
-            if(contador >= limite) {
-                sudoku[fila][col] = 0;
-                return contador;
+            // Early exit: If we already found 2+, stop
+            if(totalSolutions >= limite) {
+                sudoku[row][col] = 0;
+                return totalSolutions;
             }
             
-            sudoku[fila][col] = 0; // Backtrack
+            sudoku[row][col] = 0; // Backtrack
         }
     }
     
-    return contador;
+    return totalSolutions;
 }
 ```
 
-### ¿Por qué funciona?
+### Why Does It Work?
 
-**Teorema**: `contarSoluciones(sudoku, 2)` determina si hay solución única.
+**Theorem**: `countSolutions(sudoku, 2)` determines if there's a unique solution.
 
-**Demostración**:
-- Si contador < 2: Hay 0 o 1 soluciones
-- Si contador == 1: Solución única ✓
-- Si contador >= 2: Múltiples soluciones (early exit ahorra tiempo)
+**Proof**:
+- If counter < 2: There are 0 or 1 solutions
+- If counter == 1: Unique solution ✓
+- If counter >= 2: Multiple solutions (early exit saves time)
 
-### Optimización: Early Exit
+### Optimization: Early Exit
 
-**Sin early exit**:
+**Without early exit**:
 ```
-Tiempo = O(9^m)  (explorar todo el árbol)
-Ejemplo con m=50: 9^50 ≈ 5.15 × 10^47 operaciones
-```
-
-**Con early exit (límite = 2)**:
-```
-Tiempo = O(9^k) donde k << m  (parar en segunda solución)
-Speedup típico: 10^40 - 10^44 veces más rápido
+Time = O(9^m) where m = empty cells
+Example with m=50: 9^50 ≈ 5.15 × 10^47 operations
 ```
 
-### Análisis de Complejidad
+**With early exit (limit=2)**:
+```
+Time = O(9^k) where k << m (stop at second solution)
+Typical speedup: 10^40 to 10^44 times faster
+```
 
-| Caso | Complejidad | Explicación |
-|------|-------------|-------------|
-| Peor caso | O(9^m) | Explorar todo el árbol |
-| Caso típico | O(9^k), k << m | Early exit en 2da solución |
-| Mejor caso | O(1) | Inconsistencia detectada inmediatamente |
+### Complexity Analysis
+
+| Case | Complexity | Explanation |
+|------|------------|-------------|
+| Worst case | O(9^m) | Explore entire tree |
+| Typical case | O(9^k), k << m | Early exit at 2nd solution |
+| Best case | O(1) | Inconsistency detected immediately |
 
 ---
 
-## Análisis de Complejidad Completo
+## Complete Complexity Analysis
 
-### Tabla Resumen
+### Summary Table
 
-| Función | Complejidad | Tiempo Típico | % del Total |
-|---------|-------------|---------------|-------------|
-| `num_orden_fisher_yates()` | O(n) = O(1) | < 0.1ms | < 0.1% |
-| `llenarDiagonal()` | O(1) | < 0.1ms | < 0.1% |
-| `completarSudoku()` | O(9^m) | ~2ms | 1.9% |
-| `primeraEleccionAleatoria()` | O(1) | < 0.1ms | < 0.1% |
-| `segundaEleccionSinAlternativas()` | O(n²) | ~0.5ms | 0.5% |
-| `terceraEleccionLibre()` | O(n² × 9^m) | ~100ms | 97.4% |
-| `contarSoluciones()` | O(9^m) | Variable | - |
-| `esSafePosicion()` | O(1) | Nanosegundos | - |
-| `verificarSudoku()` | O(n²) | < 0.1ms | < 0.1% |
-| `imprimirSudoku()` | O(n²) | < 1ms | < 1% |
+| Function | Complexity | Typical Time | % of Total |
+|----------|------------|--------------|------------|
+| `fisherYatesShuffle()` | O(n) = O(1) | < 0.1ms | < 0.1% |
+| `fillDiagonal()` | O(1) | < 0.1ms | < 0.1% |
+| `completeSudoku()` | O(9^m) | ~2ms | 1.9% |
+| `firstRandomElimination()` | O(1) | < 0.1ms | < 0.1% |
+| `secondNoAlternativeElimination()` | O(n²) | ~0.5ms | 0.5% |
+| `thirdFreeElimination()` | O(n² × 9^m) | ~100ms | 97.4% |
+| `countSolutions()` | O(9^m) | Variable | - |
+| `isSafePosition()` | O(1) | Nanoseconds | - |
+| `validateSudoku()` | O(n²) | < 0.1ms | < 0.1% |
+| `printSudoku()` | O(n²) | < 1ms | < 1% |
 
-**Total**: ~102.7ms por puzzle
+**Total**: ~102.7ms per puzzle
 
-### Cuello de Botella
+### Bottleneck
 
-**FASE 3 domina el tiempo de ejecución** (97.4%)
+**PHASE 3 dominates execution time** (97.4%)
 
-**Razón**: Verificación de solución única con `contarSoluciones()` es costosa
+**Reason**: Unique solution verification with `countSolutions()` is costly
 
-**Posibles optimizaciones futuras**:
-1. Heurísticas para predecir qué celdas eliminar
-2. Caching de resultados intermedios
-3. Paralelización de verificaciones
-
----
-
-## Fundamentos Matemáticos
-
-### Espacio de Sudokus Válidos
-
-**Pregunta**: ¿Cuántos Sudokus válidos existen?
-
-**Respuesta**: 6,670,903,752,021,072,936,960 ≈ 6.67 × 10^21
-
-**Cálculo**:
-1. Primera fila: 9! = 362,880 permutaciones
-2. Restricciones subsiguientes reducen el espacio
-3. Total calculado por Felgenhauer y Jarvis (2005)
-
-### Probabilidad de Solución Única
-
-**Para puzzle típico con 50 celdas vacías**:
-
-P(única) ≈ 0.9999 si se verifica cada eliminación
-
-**Sin verificación**: P(única) ≈ 0.3-0.6 (inaceptable)
-
-### Teoría de Grafos
-
-Un Sudoku es un **problema de coloreo de grafos**:
-- **Vértices**: 81 celdas
-- **Aristas**: Conectan celdas que no pueden tener el mismo número
-- **Colores**: Números 1-9
-- **Objetivo**: Coloreo válido usando 9 colores
-
-### Complejidad Computacional
-
-**Problema de decisión**: "¿Tiene este Sudoku solución?"
-
-**Clase de complejidad**: NP-completo
-
-**Implicaciones**:
-- No hay algoritmo polinomial conocido
-- Backtracking es una solución práctica razonable
-- Verificación de solución es O(n²) (polinomial)
+**Potential future optimizations**:
+1. Heuristics to predict which cells to remove
+2. Caching intermediate results
+3. Parallelization of verifications
 
 ---
 
-## Conclusiones
+## Mathematical Foundations
 
-### Eficiencia del Sistema
+### Valid Sudoku Space
 
-1. **Generación rápida**: ~2ms (Fisher-Yates + backtracking)
-2. **Eliminación controlada**: 3 fases para solución única
-3. **Bottleneck identificado**: FASE 3 (97.4% del tiempo)
+**Question**: How many valid Sudokus exist?
 
-### Ventajas del Enfoque Híbrido
+**Answer**: 6,670,903,752,021,072,936,960 ≈ 6.67 × 10^21
 
-| Aspecto | Beneficio |
-|---------|-----------|
-| Fisher-Yates en diagonal | Reduce espacio de búsqueda |
-| Backtracking optimizado | Garantiza solución válida |
-| Eliminación en 3 fases | Puzzle jugable con solución única |
-| Verificación rigurosa | Alta calidad de puzzles |
+**Calculation**:
+1. First row: 9! = 362,880 permutations
+2. Subsequent constraints reduce the space
+3. Total calculated by Felgenhauer and Jarvis (2005)
+
+### Probability of Unique Solution
+
+**For typical puzzle with 50 empty cells**:
+
+P(unique) ≈ 0.9999 if each removal is verified
+
+**Without verification**: P(unique) ≈ 0.3-0.6 (unacceptable)
+
+### Graph Theory
+
+A Sudoku is a **graph coloring problem**:
+- **Vertices**: 81 cells
+- **Edges**: Connect cells that cannot have the same number
+- **Colors**: Numbers 1-9
+- **Goal**: Valid coloring using 9 colors
+
+### Computational Complexity
+
+**Decision problem**: "Does this Sudoku have a solution?"
+
+**Complexity class**: NP-complete
+
+**Implications**:
+- No known polynomial algorithm
+- Backtracking is a reasonable practical solution
+- Solution verification is O(n²) (polynomial)
+
+---
+
+## Conclusions
+
+### System Efficiency
+
+1. **Fast generation**: ~2ms (Fisher-Yates + backtracking)
+2. **Controlled elimination**: 3 phases for unique solution
+3. **Identified bottleneck**: PHASE 3 (97.4% of time)
+
+### Advantages of Hybrid Approach
+
+| Aspect | Benefit |
+|--------|---------|
+| Fisher-Yates on diagonal | Reduces search space |
+| Optimized backtracking | Guarantees valid solution |
+| 3-phase elimination | Playable puzzle with unique solution |
+| Rigorous verification | High quality puzzles |
 
 ### Trade-offs
 
-- **Calidad vs. Velocidad**: Verificación de solución única es costosa pero necesaria
-- **Flexibilidad vs. Rendimiento**: Variable local permite ajuste dinámico de dificultad
-- **Simplicidad vs. Optimización**: Código legible pero con margen de mejora en FASE 3
+- **Quality vs. Speed**: Unique solution verification is costly but necessary
+- **Flexibility vs. Performance**: Configurable constant allows dynamic difficulty adjustment
+- **Simplicity vs. Optimization**: Readable code with room for PHASE 3 improvement
 
-### Aplicaciones
+### Applications
 
-Este generador es adecuado para:
-- ✅ Aplicaciones educativas
-- ✅ Generación de puzzles para publicaciones
-- ✅ Juegos casuales
-- ⚠️ Generación masiva en tiempo real (requiere optimización de FASE 3)
+This generator is suitable for:
+- ✅ Educational applications
+- ✅ Puzzle generation for publications
+- ✅ Casual games
+- ⚠️ Real-time mass generation (requires PHASE 3 optimization)
 
 ---
 
-**Autor**: Gonzalo Ramírez (@chaLords)  
-**Licencia**: Apache 2.0  
-**Versión**: 2.0.0
+**Author**: Gonzalo Ramírez (@chaLords)  
+**License**: Apache 2.0  
+**Version**: 2.1.0

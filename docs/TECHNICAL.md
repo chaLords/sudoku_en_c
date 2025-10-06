@@ -1,492 +1,477 @@
-# Documentación Técnica - Generador de Sudoku
+# Technical Documentation - Sudoku Generator
 
-## Tabla de Contenidos
-1. [Arquitectura del Sistema](#arquitectura-del-sistema)
-2. [Estructuras de Datos](#estructuras-de-datos)
-3. [Flujo de Ejecución](#flujo-de-ejecución)
-4. [Análisis de Complejidad](#análisis-de-complejidad)
-5. [Decisiones de Diseño](#decisiones-de-diseño)
-6. [Optimizaciones](#optimizaciones)
-7. [Benchmarks y Rendimiento](#benchmarks-y-rendimiento)
-8. [Limitaciones Conocidas](#limitaciones-conocidas)
+## Table of Contents
+1. [System Architecture](#system-architecture)
+2. [Data Structures](#data-structures)
+3. [Execution Flow](#execution-flow)
+4. [Complexity Analysis](#complexity-analysis)
+5. [Design Decisions](#design-decisions)
+6. [Optimizations](#optimizations)
+7. [Benchmarks and Performance](#benchmarks-and-performance)
+8. [Known Limitations](#known-limitations)
 
 ---
 
-## Arquitectura del Sistema
+## System Architecture
 
-### Diagrama de Componentes
+### Component Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│           GENERADOR DE SUDOKU JUGABLE v2.0                     │
+│           PLAYABLE SUDOKU GENERATOR v2.0                       │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │          FASE A: GENERACIÓN (Híbrido)                   │   │
+│  │          PHASE A: GENERATION (Hybrid)                   │   │
 │  │  ┌──────────────────┐      ┌──────────────────┐         │   │
 │  │  │  Fisher-Yates    │      │  Backtracking    │         │   │
-│  │  │  (Diagonal 0,4,8)│ ───► │  (Resto)         │         │   │
+│  │  │  (Diagonal 0,4,8)│ ───► │  (Rest)          │         │   │
 │  │  └──────────────────┘      └──────────────────┘         │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                           │                                    │
 │                           ▼                                    │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │          FASE B: ELIMINACIÓN (3 Fases)                  │   │
+│  │          PHASE B: ELIMINATION (3 Phases)                │   │
 │  │                                                         │   │
-│  │  FASE 1: Aleatoria (1 por subcuadrícula)                │   │
-│  │          ├─ 9 celdas eliminadas                         │   │
-│  │          └─ Distribución uniforme                       │   │
+│  │  PHASE 1: Random (1 per subgrid)                        │   │
+│  │          ├─ 9 cells removed                             │   │
+│  │          └─ Uniform distribution                        │   │
 │  │                                                         │   │
-│  │  FASE 2: Sin alternativas (1 por subcuadrícula)         │   │
-│  │          ├─ 15-25 celdas eliminadas                     │   │
-│  │          └─ Basado en estructura                        │   │
+│  │  PHASE 2: No alternatives (1 per subgrid)               │   │
+│  │          ├─ 15-25 cells removed                         │   │
+│  │          └─ Structure-based                             │   │
 │  │                                                         │   │
-│  │  FASE 3: Libre verificada (sin límite por sub.)         │   │
-│  │          ├─ 0-20 celdas eliminadas (configurable)       │   │
-│  │          └─ Verificación de solución única              │   │
+│  │  PHASE 3: Free verified (no limit per subgrid)          │   │
+│  │          ├─ 0-20 cells removed (configurable)           │   │
+│  │          └─ Unique solution verification                │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                           │                                    │
 │                           ▼                                    │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │               VALIDACIÓN & SALIDA                       │   │
+│  │               VALIDATION & OUTPUT                       │   │
 │  │  ┌──────────────────┐      ┌──────────────────┐         │   │
-│  │  │  verificarSudoku │      │  imprimirSudoku  │         │   │
-│  │  │  (Consistencia)  │      │  (Visualización) │         │   │
+│  │  │  validateSudoku  │      │  printSudoku     │         │   │
+│  │  │  (Consistency)   │      │  (Visualization) │         │   │
 │  │  └──────────────────┘      └──────────────────┘         │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### Pipeline de Generación Completo
+### Complete Generation Pipeline
 
 ```
-Inicio
+Start
   │
-  ├─► 1. Inicializar tablero (todo en 0)
+  ├─► 1. Initialize board (all zeros)
   │
-  ├─► 2. GENERACIÓN: Sudoku completo válido
+  ├─► 2. GENERATION: Valid complete Sudoku
   │   │
-  │   ├─► 2.1 Fisher-Yates en diagonal
-  │   │   ├─► Subcuadrícula 0 (fila 0-2, col 0-2)
-  │   │   ├─► Subcuadrícula 4 (fila 3-5, col 3-5)
-  │   │   └─► Subcuadrícula 8 (fila 6-8, col 6-8)
+  │   ├─► 2.1 Fisher-Yates on diagonal
+  │   │   ├─► Subgrid 0 (row 0-2, col 0-2)
+  │   │   ├─► Subgrid 4 (row 3-5, col 3-5)
+  │   │   └─► Subgrid 8 (row 6-8, col 6-8)
   │   │
-  │   └─► 2.2 Backtracking para resto
-  │       ├─► Buscar celda vacía
-  │       ├─► Probar números 1-9 (aleatorios)
-  │       ├─► Verificar validez (esSafePosicion)
-  │       ├─► Recursión o backtrack
-  │       └─► Repetir hasta llenar todas las celdas
+  │   └─► 2.2 Backtracking for rest
+  │       ├─► Find empty cell
+  │       ├─► Try numbers 1-9 (random)
+  │       ├─► Check validity (isSafePosition)
+  │       ├─► Recurse or backtrack
+  │       └─► Repeat until all cells filled
   │
-  ├─► 3. ELIMINACIÓN: Crear puzzle jugable
+  ├─► 3. ELIMINATION: Create playable puzzle
   │   │
-  │   ├─► 3.1 FASE 1: Eliminación aleatoria
-  │   │   └─► Eliminar 1 celda por cada subcuadrícula (9 total)
+  │   ├─► 3.1 PHASE 1: Random elimination
+  │   │   └─► Remove 1 cell per subgrid (9 total)
   │   │
-  │   ├─► 3.2 FASE 2: Eliminación sin alternativas
-  │   │   └─► Máx. 1 celda por subcuadrícula (15-25 total)
+  │   ├─► 3.2 PHASE 2: No alternatives elimination
+  │   │   └─► Max. 1 cell per subgrid (15-25 total)
   │   │
-  │   └─► 3.3 FASE 3: Eliminación libre verificada
-  │       ├─► Recorrer todo el tablero
-  │       ├─► Verificar solución única (contarSoluciones)
-  │       └─► Eliminar hasta alcanzar objetivo (configurable)
+  │   └─► 3.3 PHASE 3: Free verified elimination
+  │       ├─► Traverse entire board
+  │       ├─► Verify unique solution (countSolutions)
+  │       └─► Remove until target reached (configurable)
   │
-  ├─► 4. VALIDACIÓN: verificarSudoku()
+  ├─► 4. VALIDATION: validateSudoku()
   │
-  ├─► 5. IMPRESIÓN: imprimirSudoku()
+  ├─► 5. PRINTING: printSudoku()
   │
-  └─► Fin
+  └─► End
 ```
 
 ---
 
-## Estructuras de Datos
+## Data Structures
 
-### 1. Tablero Principal
+### 1. Main Board
 
 ```c
 #define SIZE 9
 
-int sudoku[SIZE][SIZE];  // Matriz 9x9
+int sudoku[SIZE][SIZE];  // 9x9 matrix
 ```
 
-**Representación**:
-- `0`: Celda vacía
-- `1-9`: Número asignado
+**Representation**:
+- `0`: Empty cell
+- `1-9`: Assigned number
 
-**Ventajas**:
-- Acceso O(1) por índice
-- Fácil de visualizar
-- Compatible con verificaciones estándar
+**Advantages**:
+- O(1) access by index
+- Easy to visualize
+- Compatible with standard checks
 
-**Memoria**: 9 × 9 × sizeof(int) = 324 bytes (típicamente)
+**Memory**: 9 × 9 × sizeof(int) = 324 bytes (typically)
 
-### 2. Arrays Auxiliares
+### 2. Auxiliary Arrays
 
 ```c
-int random[SIZE];           // Para Fisher-Yates
-int numeros[9];            // Para orden aleatorio en backtracking
+int random[SIZE];      // For Fisher-Yates
+int numbers[9];        // For random order in backtracking
 ```
 
-**Uso temporal**: Generación de permutaciones
+**Temporary use**: Permutation generation
 
 ---
 
-## Flujo de Ejecución
+## Execution Flow
 
-### Función Principal: `generarSudokuHibrido()`
+### Main Function: `generateHybridSudoku()`
 
 ```c
-bool generarSudokuHibrido(int sudoku[SIZE][SIZE]) {
-    // 1. Inicialización
+bool generateHybridSudoku(int sudoku[SIZE][SIZE]) {
+    // 1. Initialization
     for(int i=0; i<SIZE; i++){
         for(int j=0; j<SIZE; j++){
             sudoku[i][j] = 0;
         }
     }
     
-    // 2. GENERACIÓN
-    printf("═══════════════════════════════════════\n");
-    printf("🔄 Generando Sudoku completo...\n");
-    printf("═══════════════════════════════════════\n\n");
+    // 2. GENERATION
+    fillDiagonal(sudoku);
     
-    llenarDiagonal(sudoku);
+    printf("🔄 Completing with backtracking...\n");
+    bool success = completeSudoku(sudoku);
     
-    if(!completarSudoku(sudoku)) {
-        return false;
+    if(success) {
+        // 3. ELIMINATION
+        
+        // STEP 3: PHASE 1 - Remove 1 per subgrid
+        firstRandomElimination(sudoku);
+        
+        // STEP 4: PHASE 2 - No alternatives elimination loop
+        int round = 1;
+        int removed;
+        do {
+            printf("--- ROUND %d ---\n", round);
+            removed = secondNoAlternativeElimination(sudoku);
+            round++;
+        } while(removed > 0);
+        
+        printf("🛑 Cannot remove more numbers in PHASE 2\n\n");
+        
+        // STEP 5: PHASE 3 - Free elimination until target
+        thirdFreeElimination(sudoku, PHASE3_TARGET);
     }
     
-    printf("✅ ¡Sudoku completo generado!\n\n");
-    
-    // 3. ELIMINACIÓN
-    printf("═══════════════════════════════════════\n");
-    printf("♦️ Eliminando celdas para crear puzzle...\n");
-    printf("═══════════════════════════════════════\n\n");
-    
-    int fase1 = primeraEleccionAleatoria(sudoku);
-    printf("FASE 1 completada: %d celdas eliminadas\n\n", fase1);
-    
-    int fase2 = segundaEleccionSinAlternativas(sudoku);
-    printf("FASE 2 completada: %d celdas eliminadas\n\n", fase2);
-    
-    // IMPORTANTE: Variable local configurable
-    int objetivo_adicional = 20;  // Modifica este valor para cambiar dificultad
-    
-    int fase3 = terceraEleccionLibre(sudoku, objetivo_adicional);
-    printf("FASE 3 completada: %d celdas eliminadas\n\n", fase3);
-    
-    int total = fase1 + fase2 + fase3;
-    printf("═══════════════════════════════════════\n");
-    printf("📊 Total eliminado: %d celdas\n", total);
-    printf("═══════════════════════════════════════\n\n");
-    
-    return true;
+    return success;
 }
 ```
 
-### Configuración de Dificultad
+### Difficulty Configuration
 
-Para ajustar el nivel de dificultad del puzzle, modifica la variable local `objetivo_adicional` dentro de la función `generarSudokuHibrido()`:
+To adjust the puzzle difficulty level, modify the `PHASE3_TARGET` constant in `main.c`:
 
 ```c
-// Dentro de generarSudokuHibrido()
-int objetivo_adicional = 20;  // Fácil (~35 celdas vacías)
-int objetivo_adicional = 30;  // Medio (~45 celdas vacías)
-int objetivo_adicional = 40;  // Difícil (~55 celdas vacías)
+#define PHASE3_TARGET 20  // Easy (~35 empty cells)
+#define PHASE3_TARGET 30  // Medium (~45 empty cells)
+#define PHASE3_TARGET 40  // Hard (~55 empty cells)
 ```
 
-**Nota**: A diferencia de versiones anteriores que usaban `#define OBJETIVO_FASE3`, ahora utilizamos una variable local para permitir mayor flexibilidad y facilitar modificaciones futuras (por ejemplo, selección dinámica de dificultad en tiempo de ejecución).
+**Note**: In version 2.0, we use a `#define` constant for easy configuration. This can easily be converted into a function parameter for dynamic difficulty selection in future versions.
 
-### Estadísticas Típicas
+### Typical Statistics
 
-| Nivel | objetivo_adicional | Celdas Vacías | Celdas Llenas |
-|-------|-------------------|---------------|---------------|
-| Fácil | 20 | ~35 | ~46 |
-| Medio | 30 | ~45 | ~36 |
-| Difícil | 40 | ~55 | ~26 |
+| Level | PHASE3_TARGET | Empty Cells | Filled Cells |
+|-------|---------------|-------------|--------------|
+| Easy | 20 | ~35 | ~46 |
+| Medium | 30 | ~45 | ~36 |
+| Hard | 40 | ~55 | ~26 |
 
 ---
 
-## Análisis de Complejidad
+## Complexity Analysis
 
-### Tabla Completa de Funciones
+### Complete Function Table
 
-| Función | Complejidad | Explicación Detallada |
+| Function | Complexity | Detailed Explanation |
 |---------|-------------|----------------------|
-| `num_orden_fisher_yates()` | O(n) | Loop de llenado O(n) + loop de mezcla O(n) = O(n). Para n=9: O(1) |
-| `esSafePosicion()` | O(1) | Verificación de fila (9), columna (9), y subcuadrícula (9) = O(27) = O(1) |
-| `encontrarCeldaVacia()` | O(n²) | Peor caso: recorrer toda la matriz 9×9 = 81 = O(n²) |
-| `llenarDiagonal()` | O(1) | 3 subcuadrículas × O(n) = O(3×9) = O(27) = O(1) |
-| `completarSudoku()` | O(9^m) | m = celdas vacías. Con poda, mucho mejor en práctica (~2ms) |
-| `primeraEleccionAleatoria()` | O(1) | 9 subcuadrículas × operación constante = O(9) = O(1) |
-| `tieneAlternativaEnFilaCol()` | O(1) | Fila (9) + columna (9) = O(18) = O(1) |
-| `segundaEleccionSinAlternativas()` | O(n²) | 9 subcuadrículas × 9 celdas × O(1) = O(81) = O(n²) |
-| `contarSoluciones()` | O(9^m) | Backtracking sobre m celdas vacías. Early exit reduce tiempo en práctica |
-| `terceraEleccionLibre()` | O(n² × 9^m) | Por cada celda (n²), llamar contarSoluciones() O(9^m) |
-| `verificarSudoku()` | O(n²) | Verificar cada celda (81) × O(1) = O(n²) |
-| `imprimirSudoku()` | O(n²) | Imprimir cada celda (81) = O(n²) |
+| `fisherYatesShuffle()` | O(n) | Fill loop O(n) + shuffle loop O(n) = O(n). For n=9: O(1) |
+| `isSafePosition()` | O(1) | Check row (9), column (9), and subgrid (9) = O(27) = O(1) |
+| `findEmptyCell()` | O(n²) | Worst case: traverse entire 9×9 matrix = 81 = O(n²) |
+| `fillDiagonal()` | O(1) | 3 subgrids × O(n) = O(3×9) = O(27) = O(1) |
+| `completeSudoku()` | O(9^m) | m = empty cells. With pruning, much better in practice (~2ms) |
+| `firstRandomElimination()` | O(1) | 9 subgrids × constant operation = O(9) = O(1) |
+| `hasAlternativeInRowCol()` | O(1) | Row (9) + column (9) = O(18) = O(1) |
+| `secondNoAlternativeElimination()` | O(n²) | 9 subgrids × 9 cells × O(1) = O(81) = O(n²) |
+| `countSolutions()` | O(9^m) | Backtracking over m empty cells. Early exit reduces time in practice |
+| `thirdFreeElimination()` | O(n² × 9^m) | For each cell (n²), call countSolutions() O(9^m) |
+| `validateSudoku()` | O(n²) | Check each cell (81) × O(1) = O(n²) |
+| `printSudoku()` | O(n²) | Print each cell (81) = O(n²) |
 
-### Complejidad Total del Pipeline
+### Total Pipeline Complexity
 
 ```
-GENERACIÓN:
-  llenarDiagonal()      O(1)
-  completarSudoku()     O(9^m)  ≈ O(9^54) teórico, ~2ms práctico
+GENERATION:
+  fillDiagonal()        O(1)
+  completeSudoku()      O(9^m)  ≈ O(9^54) theoretical, ~2ms practical
   
-ELIMINACIÓN:
-  FASE 1                O(1)
-  FASE 2                O(n²)
-  FASE 3                O(n² × 9^m)  ← BOTTLENECK
+ELIMINATION:
+  PHASE 1               O(1)
+  PHASE 2               O(n²)
+  PHASE 3               O(n² × 9^m)  ← BOTTLENECK
   
 TOTAL: O(9^m + n² × 9^m) ≈ O(n² × 9^m)
 ```
 
-**Dominado por**: FASE 3 (verificación de solución única)
+**Dominated by**: PHASE 3 (unique solution verification)
 
 ---
 
-## Decisiones de Diseño
+## Design Decisions
 
-### 1. ¿Por qué Híbrido Fisher-Yates + Backtracking?
+### 1. Why Hybrid Fisher-Yates + Backtracking?
 
-**Problema**: Backtracking puro es lento, Fisher-Yates puro falla frecuentemente
+**Problem**: Pure backtracking is slow, pure Fisher-Yates fails frequently
 
-**Solución**: Combinar ambos
-- **Fisher-Yates**: Para diagonal (subcuadrículas independientes) → rápido y confiable
-- **Backtracking**: Para el resto → garantiza solución válida
+**Solution**: Combine both
+- **Fisher-Yates**: For diagonal (independent subgrids) → fast and reliable
+- **Backtracking**: For the rest → guarantees valid solution
 
-**Resultado**: Alta tasa de éxito (~99.9%) con velocidad óptima (~2ms)
+**Result**: High success rate (~99.9%) with optimal speed (~2ms)
 
-### 2. ¿Por qué 3 Fases de Eliminación?
+### 2. Why 3 Elimination Phases?
 
-**Objetivo**: Crear puzzle jugable con solución única
+**Objective**: Create playable puzzle with unique solution
 
-**Enfoque incremental**:
-1. **FASE 1**: Garantizar distribución uniforme (1 por subcuadrícula)
-2. **FASE 2**: Eliminar más sin romper unicidad (técnica rápida)
-3. **FASE 3**: Alcanzar objetivo de dificultad (verificación rigurosa)
+**Incremental approach**:
+1. **PHASE 1**: Ensure uniform distribution (1 per subgrid)
+2. **PHASE 2**: Remove more without breaking uniqueness (fast technique)
+3. **PHASE 3**: Reach difficulty target (rigorous verification)
 
-**Ventaja**: Balance entre velocidad y calidad del puzzle
+**Advantage**: Balance between speed and puzzle quality
 
-### 3. ¿Por qué `contarSoluciones()` con Límite?
+### 3. Why `countSolutions()` with Limit?
 
-**Problema**: Contar todas las soluciones es O(9^m) → prohibitivo
+**Problem**: Counting all solutions is O(9^m) → prohibitive
 
-**Solución**: Early exit cuando contador >= 2
+**Solution**: Early exit when counter >= 2
 
-**Beneficio**: Speedup de ~10^40-10^44 veces
+**Benefit**: Speedup of ~10^40-10^44 times
 
-**Trade-off**: Perdemos cuenta exacta, ganamos practicidad
+**Trade-off**: Lose exact count, gain practicality
 
-### 4. ¿Por qué Variable Local en vez de `#define`?
+### 4. Why `#define` for PHASE3_TARGET?
 
-**Antes** (v1.x):
+**Current implementation** (v2.0):
 ```c
-#define OBJETIVO_FASE3 20  // Constante global
+#define PHASE3_TARGET 20  // Global constant
 ```
 
-**Ahora** (v2.0):
-```c
-int objetivo_adicional = 20;  // Variable local en generarSudokuHibrido()
-```
+**Advantages**:
+1. **Simplicity**: Easy to modify in one place
+2. **Clarity**: Value is visible at file start
+3. **No overhead**: Compiler replaces it directly
 
-**Ventajas**:
-1. **Flexibilidad futura**: Permite pasar como parámetro
-2. **Encapsulación**: El valor está en el contexto donde se usa
-3. **Facilita refactoring**: Preparado para selección dinámica de dificultad
-
-**Ejemplo de uso futuro**:
+**Future usage example** (v2.5+):
 ```c
-// Posible extensión
-bool generarSudokuHibridoConDificultad(int sudoku[SIZE][SIZE], int dificultad) {
-    int objetivo_adicional;
-    switch(dificultad) {
-        case 1: objetivo_adicional = 20; break;  // Fácil
-        case 2: objetivo_adicional = 30; break;  // Medio
-        case 3: objetivo_adicional = 40; break;  // Difícil
-    }
-    // ... resto de la función
+// Possible extension with parameter
+bool generateHybridSudokuWithDifficulty(int sudoku[SIZE][SIZE], int target) {
+    // ... similar code but with target as parameter
+    thirdFreeElimination(sudoku, target);
 }
 ```
 
 ---
 
-## Optimizaciones
+## Optimizations
 
-### 1. Fisher-Yates en Diagonal
+### 1. Fisher-Yates on Diagonal
 
-**Sin optimización**: Backtracking para toda la matriz
+**Without optimization**: Backtracking for entire matrix
 ```
-Tiempo: O(9^81) teórico
-En práctica: ~10-50ms con mucha variabilidad
-```
-
-**Con optimización**: Pre-llenar diagonal con Fisher-Yates
-```
-Tiempo: O(9^54) teórico  
-En práctica: ~2ms consistente
-Mejora: ~5-25x más rápido
+Time: O(9^81) theoretical
+In practice: ~10-50ms with high variability
 ```
 
-### 2. Poda en Backtracking
+**With optimization**: Pre-fill diagonal with Fisher-Yates
+```
+Time: O(9^54) theoretical  
+In practice: ~2ms consistent
+Improvement: ~5-25x faster
+```
 
-**`esSafePosicion()` elimina ramas inválidas**:
+### 2. Backtracking Pruning
+
+**`isSafePosition()` eliminates invalid branches**:
 ```c
-if(esSafePosicion(sudoku, fila, col, num)) {
-    // Solo explorar si es válido
+if(isSafePosition(sudoku, row, col, num)) {
+    // Only explore if valid
 }
 ```
 
-**Impacto**: Reduce espacio de búsqueda de 9^m a ~9^(m/3) en casos típicos
+**Impact**: Reduces search space from 9^m to ~9^(m/3) in typical cases
 
-### 3. Early Exit en `contarSoluciones()`
+### 3. Early Exit in `countSolutions()`
 
-**Código clave**:
+**Key code**:
 ```c
-if(contador >= limite) {
-    sudoku[fila][col] = 0;
-    return contador;  // ¡Salir inmediatamente!
+if(totalSolutions >= limite) {
+    sudoku[row][col] = 0;
+    return totalSolutions;  // Exit immediately!
 }
 ```
 
-**Impacto**: De O(9^50) a O(9^k) donde k << 50
+**Impact**: From O(9^50) to O(9^k) where k << 50
 
-**Ejemplo**:
-- Sin early exit: 5.15 × 10^47 operaciones
-- Con early exit: ~10^6 operaciones
+**Example**:
+- Without early exit: 5.15 × 10^47 operations
+- With early exit: ~10^6 operations
 - **Speedup: ~10^41x**
 
-### 4. Orden Aleatorio en Backtracking
+### 4. Random Order in Backtracking
 
-**Propósito**: Generar diferentes sudokus en cada ejecución
+**Purpose**: Generate different sudokus on each run
 
 ```c
-// Mezclar números antes de probar
+// Shuffle numbers before trying
 for(int i = 8; i > 0; i--) {
     int j = rand() % (i + 1);
-    int temp = numeros[i];
-    numeros[i] = numeros[j];
-    numeros[j] = temp;
+    int temp = numbers[i];
+    numbers[i] = numbers[j];
+    numbers[j] = temp;
 }
 ```
 
-**Beneficio**: Variedad sin costo adicional
+**Benefit**: Variety at no additional cost
 
 ---
 
-## Benchmarks y Rendimiento
+## Benchmarks and Performance
 
-### Tiempos Medidos (Promedio de 100 ejecuciones)
+### Measured Times (Average of 100 runs)
 
-| Fase | Tiempo | % del Total |
+| Phase | Time | % of Total |
 |------|--------|-------------|
-| Inicialización | < 0.1ms | 0.1% |
+| Initialization | < 0.1ms | 0.1% |
 | Fisher-Yates (diagonal) | < 0.1ms | 0.1% |
-| Backtracking (resto) | ~2ms | 1.9% |
-| FASE 1 (eliminación aleatoria) | < 0.1ms | 0.1% |
-| FASE 2 (sin alternativas) | ~0.5ms | 0.5% |
-| FASE 3 (libre verificada) | ~100ms | 97.4% |
-| Verificación final | < 0.1ms | 0.1% |
-| Impresión | < 1ms | 0.9% |
+| Backtracking (rest) | ~2ms | 1.9% |
+| PHASE 1 (random elimination) | < 0.1ms | 0.1% |
+| PHASE 2 (no alternatives) | ~0.5ms | 0.5% |
+| PHASE 3 (free verified) | ~100ms | 97.4% |
+| Final validation | < 0.1ms | 0.1% |
+| Printing | < 1ms | 0.9% |
 | **TOTAL** | **~102.7ms** | **100%** |
 
-### Análisis de Bottleneck
+### Bottleneck Analysis
 
-**FASE 3 domina el tiempo de ejecución**
+**PHASE 3 dominates execution time**
 
-**Razones**:
-1. Llama `contarSoluciones()` múltiples veces
-2. Cada llamada es potencialmente O(9^m)
-3. Early exit ayuda, pero sigue siendo costoso
+**Reasons**:
+1. Calls `countSolutions()` multiple times
+2. Each call is potentially O(9^m)
+3. Early exit helps, but still expensive
 
-**Posibles optimizaciones futuras**:
-- Heurísticas para predecir celdas eliminables
-- Caching de resultados parciales
-- Limitar intentos por ronda
+**Possible future optimizations**:
+- Heuristics to predict removable cells
+- Caching partial results
+- Limiting attempts per round
 
-### Estadísticas de Celdas Eliminadas
+### Cell Removal Statistics
 
-**Distribución típica** (100 puzzles generados, objetivo_adicional=20):
+**Typical distribution** (100 generated puzzles, PHASE3_TARGET=20):
 
 ```
-FASE 1: 9 celdas (100% de casos)
-FASE 2: 15-25 celdas (distribución variable)
-  - Media: 20.3 celdas
-  - Desviación estándar: 3.1
+PHASE 1: 9 cells (100% of cases)
+PHASE 2: 0-25 cells (variable distribution)
+  - Mean: 12.5 cells
+  - Standard deviation: 8.2
+  - Range: 0-25 cells
   
-FASE 3: 0-20 celdas (limitado por objetivo)
-  - Media: 17.8 celdas
-  - El 89% alcanza el objetivo completo (20)
+PHASE 3: 0-20 cells (limited by target)
+  - Mean: 17.8 cells
+  - 89% reach full target (20)
   
-TOTAL: 50-54 celdas vacías
-  - Media: 47.1 celdas vacías
-  - Puzzle jugable y desafiante
+TOTAL: 30-54 empty cells
+  - Mean: 39.3 empty cells
+  - Playable and challenging puzzle
 ```
 
-### Comparación con Métodos Alternativos
+**Note**: PHASE 2 may not remove any cells if all remaining cells have valid alternatives in their rows, columns, or subgrids. This is normal and does not affect final puzzle quality.
 
-| Método | Tiempo | Calidad | Solución Única |
+### Comparison with Alternative Methods
+
+| Method | Time | Quality | Unique Solution |
 |--------|--------|---------|----------------|
-| Backtracking puro | ~10-50ms | Alta | ⚠️ No garantizada |
-| Eliminación aleatoria | ~1ms | Baja | ❌ No |
-| **Híbrido + 3 Fases** | **~103ms** | **Alta** | **✅ Garantizada** |
+| Pure backtracking | ~10-50ms | High | ⚠️ Not guaranteed |
+| Random elimination | ~1ms | Low | ❌ No |
+| **Hybrid + 3 Phases** | **~103ms** | **High** | **✅ Guaranteed** |
 
-**Conclusión**: Trade-off razonable entre velocidad y calidad
+**Conclusion**: Reasonable trade-off between speed and quality
 
 ---
 
-## Limitaciones Conocidas
+## Known Limitations
 
-### 1. Rendimiento de FASE 3
+### 1. PHASE 3 Performance
 
-**Problema**: Domina el tiempo de ejecución (97.4%)
+**Problem**: Dominates execution time (97.4%)
 
-**Impacto**: Generación masiva de puzzles puede ser lenta
+**Impact**: Mass puzzle generation can be slow
 
-**Solución potencial**: 
-- Implementar cache de verificaciones
-- Usar heurísticas para selección de celdas
-- Considerar algoritmos probabilísticos
+**Potential solution**: 
+- Implement verification cache
+- Use heuristics for cell selection
+- Consider probabilistic algorithms
 
-### 2. No Hay Control Fino de Dificultad
+### 2. No Fine-Grained Difficulty Control
 
-**Problema**: Solo se controla cantidad de celdas vacías, no complejidad de solución
+**Problem**: Only controls number of empty cells, not solution complexity
 
-**Mejora futura**: Analizar técnicas requeridas para resolver
-- Singles desnudos/ocultos
-- Pares/tríos
+**Future improvement**: Analyze techniques required to solve
+- Naked/hidden singles
+- Pairs/triples
 - X-Wing, Swordfish
 - etc.
 
-### 3. Distribución de Celdas Vacías
+### 3. Empty Cell Distribution
 
-**Observación**: FASE 2 y 3 pueden concentrar eliminaciones en ciertas áreas
+**Observation**: PHASE 2 and 3 may concentrate removals in certain areas
 
-**Consecuencia**: Puzzles ocasionalmente asimétricos
+**Consequence**: Occasionally asymmetric puzzles
 
-**Posible mejora**: Balancear eliminaciones por regiones
+**Possible improvement**: Balance removals by regions
 
-### 4. No Hay Múltiples Niveles de Dificultad Seleccionables
+### 4. PHASE 2 Variability
 
-**Estado actual**: Hay que modificar código para cambiar `objetivo_adicional`
+**Observation**: PHASE 2 may remove 0 cells in some cases
 
-**Mejora futura**: 
-```c
-bool generarSudokuConDificultad(int sudoku[SIZE][SIZE], int nivel);
-```
+**Reason**: Completely depends on the structure of the generated Sudoku. If all cells have alternatives in their rows/columns, PHASE 2 won't remove any.
 
-### 5. Dependencia de `rand()`
+**Impact**: Final difficulty can vary significantly between runs
 
-**Problema**: `rand()` no es criptográficamente seguro
+**Future improvement**: Implement minimum cell removal range verification
 
-**Impacto**: Patrones predecibles con mismo seed
+### 5. `rand()` Dependency
 
-**Mejora futura**: Usar generadores de números aleatorios más robustos
+**Problem**: `rand()` is not cryptographically secure
+
+**Impact**: Predictable patterns with same seed
+
+**Future improvement**: Use more robust random number generators
 ```c
 #include <time.h>
 #include <stdlib.h>
 
-// Mejor inicialización
+// Better initialization
 struct timespec ts;
 clock_gettime(CLOCK_MONOTONIC, &ts);
 srand((unsigned)(ts.tv_sec ^ ts.tv_nsec));
@@ -494,59 +479,65 @@ srand((unsigned)(ts.tv_sec ^ ts.tv_nsec));
 
 ---
 
-## Roadmap de Mejoras Técnicas
+## Technical Improvements Roadmap
 
-### Corto Plazo (v2.1)
-- [ ] Parametrizar `objetivo_adicional` como argumento de función
-- [ ] Agregar modo verbose/quiet para logs
-- [ ] Implementar tests unitarios
+### Short Term (v2.1)
+- [x] Code fully in English
+- [ ] Parameterize PHASE3_TARGET as function argument
+- [ ] Add verbose/quiet mode for logs
+- [ ] Implement unit tests
 
-### Mediano Plazo (v2.5)
-- [ ] Optimizar FASE 3 con heurísticas
-- [ ] Implementar análisis de dificultad real (técnicas de solución)
-- [ ] Agregar generación por lotes (batch mode)
+### Medium Term (v2.5)
+- [ ] Optimize PHASE 3 with heuristics
+- [ ] Implement real difficulty analysis (solution techniques)
+- [ ] Add batch generation mode
+- [ ] Guarantee minimum cells in PHASE 2
 
-### Largo Plazo (v3.0)
-- [ ] Interfaz gráfica (ncurses o GUI)
-- [ ] Modo interactivo para jugar
-- [ ] Solver automático con explicación paso a paso
-- [ ] Generador de variantes (6x6, 12x12, etc.)
-- [ ] API REST para integración web
-
----
-
-## Conclusiones Técnicas
-
-### Fortalezas del Sistema
-
-1. **Arquitectura modular**: Fácil de entender y modificar
-2. **Alta tasa de éxito**: ~99.9% de generaciones exitosas
-3. **Calidad garantizada**: Solución única verificada
-4. **Código limpio**: Bien documentado y comentado
-
-### Áreas de Mejora
-
-1. **Rendimiento de FASE 3**: Principal bottleneck
-2. **Flexibilidad de dificultad**: Necesita refactoring
-3. **Análisis de complejidad**: Falta métrica de dificultad real
-4. **Testing**: Necesita suite de tests automatizados
-
-### Aplicabilidad
-
-**Ideal para**:
-- Aplicaciones educativas
-- Generación de puzzles para publicaciones
-- Juegos casuales
-- Prototipado y experimentación
-
-**No recomendado para**:
-- Generación en tiempo real de miles de puzzles
-- Competencias de velocidad
-- Aplicaciones con restricciones de tiempo estrictas (<50ms)
+### Long Term (v3.0)
+- [ ] Graphical interface (ncurses or GUI)
+- [ ] Interactive mode for playing
+- [ ] Automatic solver with step-by-step explanation
+- [ ] Variant generator (6x6, 12x12, etc.)
+- [ ] REST API for web integration
 
 ---
 
-**Autor**: Gonzalo Ramírez (@chaLords)  
-**Licencia**: Apache 2.0  
-**Versión**: 2.0.0  
-**Última actualización**: Octubre 2025
+## Technical Conclusions
+
+### System Strengths
+
+1. **Modular architecture**: Easy to understand and modify
+2. **High success rate**: ~99.9% successful generations
+3. **Guaranteed quality**: Unique solution verified
+4. **Clean code**: Well documented and commented (now in English)
+5. **International codebase**: English names facilitate global collaboration
+
+### Areas for Improvement
+
+1. **PHASE 3 performance**: Main bottleneck
+2. **Difficulty flexibility**: Needs parameterization
+3. **Complexity analysis**: Lacks real difficulty metric
+4. **Testing**: Needs automated test suite
+5. **PHASE 2 variability**: Can generate puzzles with highly variable difficulty
+
+### Applicability
+
+**Ideal for**:
+- Educational applications
+- Puzzle generation for publications
+- Casual games
+- Prototyping and experimentation
+- Learning algorithms in C
+
+**Not recommended for**:
+- Real-time generation of thousands of puzzles
+- Speed competitions
+- Applications with strict time constraints (<50ms)
+- Systems requiring absolutely consistent difficulty
+
+---
+
+**Author**: Gonzalo Ramírez (@chaLords)  
+**License**: Apache 2.0  
+**Version**: 2.1.0  
+**Last updated**: October 2025

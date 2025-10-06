@@ -2,12 +2,58 @@ Sudoku Generator in C
 Copyright 2025 Gonzalo Ramírez (@chaLords)
 https://github.com/chaLords/sudoku_en_c
 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this software except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+================================================================================
+
 This product includes software developed by Gonzalo Ramírez.
 
 Algorithm implementations:
-- Fisher-Yates shuffle: Original implementation by Gonzalo Ramírez
-- Hybrid backtracking approach: Original design by Gonzalo Ramírez
-- Sudoku validation: Original implementation by Gonzalo Ramírez
+- Fisher-Yates shuffle: Original C implementation by Gonzalo Ramírez
+  Based on the algorithm by Ronald Fisher and Frank Yates (1938)
+  
+- Hybrid backtracking approach: Original design and implementation by Gonzalo Ramírez
+  Combines Fisher-Yates for diagonal subgrids with recursive backtracking
+  
+- Three-phase cell elimination system: Original design by Gonzalo Ramírez
+  Includes random elimination, no-alternatives elimination, and verified free elimination
+  
+- Unique solution verification: Original implementation by Gonzalo Ramírez
+  Uses early-exit optimization for efficient solution counting
 
-If you use this software in your project, please provide attribution
-as specified in the Apache License 2.0.
+Acknowledgments:
+- Fisher-Yates shuffle algorithm: Ronald Fisher and Frank Yates (1938)
+- Backtracking concept: General algorithmic technique in computer science
+- Sudoku puzzle rules: Traditional Japanese number puzzle game
+
+================================================================================
+
+ATTRIBUTION REQUIREMENTS:
+
+If you use this software in your project, you must:
+
+1. Include a copy of the Apache License 2.0
+2. Include this NOTICE file
+3. Provide clear attribution to the original author:
+   
+   "This project uses Sudoku Generator in C
+    Copyright 2025 Gonzalo Ramírez (@chaLords)
+    Licensed under Apache License 2.0
+    https://github.com/chaLords/sudoku_en_c"
+
+4. State any modifications made to the original software
+5. Retain all copyright notices in source files
+
+For questions about licensing or attribution, contact:
+- GitHub: @chaLords
+- Email: chaLords@icloud.com
