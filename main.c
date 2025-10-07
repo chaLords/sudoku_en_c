@@ -23,7 +23,7 @@
  */
 
 #define SIZE 9
-#define PHASE3_TARGET 20  // Constant for phase 3
+#define PHASE3_TARGET 15  // Constant for phase 3
 
 // ═══════════════════════════════════════════════════════════════════
 //                    1. BASIC UTILITIES

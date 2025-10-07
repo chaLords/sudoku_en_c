@@ -199,7 +199,7 @@ COMPLETE SUDOKU (81 filled cells)
             └─ 0-20 cells removed (configurable)
                 │
                 ▼
-        PLAYABLE PUZZLE (30-54 empty cells)
+        PLAYABLE PUZZLE (30-58 empty cells)
 ```
 
 ### PHASE 1: Random Elimination

@@ -42,7 +42,7 @@
 │  │          └─ Structure-based                             │   │
 │  │                                                         │   │
 │  │  PHASE 3: Free verified (no limit per subgrid)          │   │
-│  │          ├─ 0-20 cells removed (configurable)           │   │
+│  │          ├─ 0-25 cells removed (configurable)           │   │
 │  │          └─ Unique solution verification                │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                           │                                    │
@@ -181,9 +181,9 @@ bool generateHybridSudoku(int sudoku[SIZE][SIZE]) {
 To adjust the puzzle difficulty level, modify the `PHASE3_TARGET` constant in `main.c`:
 
 ```c
-#define PHASE3_TARGET 20  // Easy (~35 empty cells)
-#define PHASE3_TARGET 30  // Medium (~45 empty cells)
-#define PHASE3_TARGET 40  // Hard (~55 empty cells)
+#define PHASE3_TARGET 5  // Easy (~35 empty cells)
+#define PHASE3_TARGET 15  // Medium (~45 empty cells)
+#define PHASE3_TARGET 25  // Hard (~55 empty cells)
 ```
 
 **Note**: In version 2.0, we use a `#define` constant for easy configuration. This can easily be converted into a function parameter for dynamic difficulty selection in future versions.
@@ -192,9 +192,9 @@ To adjust the puzzle difficulty level, modify the `PHASE3_TARGET` constant in `m
 
 | Level | PHASE3_TARGET | Empty Cells | Filled Cells |
 |-------|---------------|-------------|--------------|
-| Easy | 20 | ~35 | ~46 |
-| Medium | 30 | ~45 | ~36 |
-| Hard | 40 | ~55 | ~26 |
+| Easy | 5 | ~35 | ~46 |
+| Medium | 15 | ~45 | ~36 |
+| Hard | 25 | ~55 | ~26 |
 
 ---
 

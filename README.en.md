@@ -38,85 +38,123 @@
 
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.0.0 - HYBRID METHOD
+        SUDOKU GENERATOR v2.1.0 - HYBRID METHOD
            Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
 🚀 ATTEMPT #1:
 🎲 Filling main diagonal with Fisher-Yates...
-   Subgrid 0 (base: 0,0): 8 5 3 7 6 2 1 9 4
-   Subgrid 4 (base: 3,3): 1 9 7 4 3 8 2 5 6
-   Subgrid 8 (base: 6,6): 3 6 5 1 8 7 9 4 2
+   Subgrid 0 (base: 0,0): 1 2 5 7 3 8 6 9 4 
+   Subgrid 4 (base: 3,3): 6 2 8 5 4 7 1 9 3 
+   Subgrid 8 (base: 6,6): 9 2 3 6 8 5 7 4 1 
 ✅ Diagonal completed!
 
 🔄 Completing with backtracking...
-
 🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...
-   Subgrid 0 (base: 0,0): 8
-   Subgrid 1 (base: 0,3): 9
-   Subgrid 2 (base: 0,6): 1
-   Subgrid 3 (base: 3,0): 4
-   Subgrid 4 (base: 3,3): 7
-   Subgrid 5 (base: 3,6): 5
-   Subgrid 6 (base: 6,0): 7
-   Subgrid 7 (base: 6,3): 4
-   Subgrid 8 (base: 6,6): 6
+   Subgrid 0 (base: 0,0): 4 
+   Subgrid 1 (base: 0,3): 9 
+   Subgrid 2 (base: 0,6): 3 
+   Subgrid 3 (base: 3,0): 5 
+   Subgrid 4 (base: 3,3): 8 
+   Subgrid 5 (base: 3,6): 7 
+   Subgrid 6 (base: 6,0): 6 
+   Subgrid 7 (base: 6,3): 1 
+   Subgrid 8 (base: 6,6): 2 
 ✅ Phase 1 completed!
 
 --- ROUND 1 ---
 🎲 PHASE 2: Selecting numbers without alternatives...
-   Subgrid 0 (base: 0,0):
-   Subgrid 1 (base: 0,3):
-   Subgrid 2 (base: 0,6):
-   Subgrid 3 (base: 3,0):
-   Subgrid 4 (base: 3,3):
-   Subgrid 5 (base: 3,6):
-   Subgrid 6 (base: 6,0):
-   Subgrid 7 (base: 6,3):
-   Subgrid 8 (base: 6,6):
+   Subgrid 0 (base: 0,0): 1 
+   Subgrid 1 (base: 0,3): 3 
+   Subgrid 2 (base: 0,6): 4 
+   Subgrid 3 (base: 3,0): 7 
+   Subgrid 4 (base: 3,3): 6 
+   Subgrid 5 (base: 3,6): 9 
+   Subgrid 6 (base: 6,0): 8 
+   Subgrid 7 (base: 6,3): 7 
+   Subgrid 8 (base: 6,6): 6 
+✅ Phase 2 completed! Removed: 9
+
+--- ROUND 2 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0): 2 
+   Subgrid 1 (base: 0,3): 8 
+   Subgrid 2 (base: 0,6): 2 
+   Subgrid 3 (base: 3,0): 3 
+   Subgrid 4 (base: 3,3): 2 
+   Subgrid 5 (base: 3,6): 4 
+   Subgrid 6 (base: 6,0): 3 
+   Subgrid 7 (base: 6,3): 5 
+   Subgrid 8 (base: 6,6): 5 
+✅ Phase 2 completed! Removed: 9
+
+--- ROUND 3 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0): 9 
+   Subgrid 1 (base: 0,3): 
+   Subgrid 2 (base: 0,6): 8 
+   Subgrid 3 (base: 3,0): 
+   Subgrid 4 (base: 3,3): 3 
+   Subgrid 5 (base: 3,6): 1 
+   Subgrid 6 (base: 6,0): 
+   Subgrid 7 (base: 6,3): 4 
+   Subgrid 8 (base: 6,6): 7 
+✅ Phase 2 completed! Removed: 6
+
+--- ROUND 4 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0): 
+   Subgrid 1 (base: 0,3): 
+   Subgrid 2 (base: 0,6): 
+   Subgrid 3 (base: 3,0): 
+   Subgrid 4 (base: 3,3): 
+   Subgrid 5 (base: 3,6): 
+   Subgrid 6 (base: 6,0): 
+   Subgrid 7 (base: 6,3): 
+   Subgrid 8 (base: 6,6): 
 ✅ Phase 2 completed! Removed: 0
 
 🛑 Cannot remove more numbers in PHASE 2
 
 🎲 PHASE 3: Free elimination with unique solution verification...
-   Removed 8 at (1,7) - Total: 1
-   Removed 6 at (0,8) - Total: 2
-   Removed 8 at (3,4) - Total: 3
-   Removed 2 at (2,6) - Total: 4
-   Removed 2 at (8,5) - Total: 5
-   Removed 1 at (5,6) - Total: 6
-   Removed 1 at (8,3) - Total: 7
-   Removed 1 at (2,8) - Total: 8
-   Removed 6 at (2,4) - Total: 9
-   Removed 9 at (2,3) - Total: 10
-   Removed 9 at (6,7) - Total: 11
-   Removed 5 at (5,1) - Total: 12
-   Removed 8 at (8,0) - Total: 13
-   Removed 9 at (1,1) - Total: 14
-   Removed 3 at (6,4) - Total: 15
-   Removed 5 at (4,3) - Total: 16
-   Removed 1 at (3,5) - Total: 17
-   Removed 2 at (6,8) - Total: 18
-   Removed 7 at (5,3) - Total: 19
-   Removed 5 at (7,4) - Total: 20
+   Removed 9 at (4,0) - Total: 1
+   Removed 7 at (2,4) - Total: 2
+   Removed 4 at (4,4) - Total: 3
+   Removed 1 at (3,1) - Total: 4
+   Removed 7 at (1,0) - Total: 5
+   Removed 9 at (5,4) - Total: 6
+   Removed 4 at (6,1) - Total: 7
+   Removed 9 at (7,5) - Total: 8
+   Removed 6 at (2,0) - Total: 9
+   Removed 7 at (4,5) - Total: 10
+   Removed 2 at (7,0) - Total: 11
+   Removed 6 at (0,5) - Total: 12
+   Removed 6 at (5,1) - Total: 13
+   Removed 6 at (8,4) - Total: 14
+   Removed 2 at (4,6) - Total: 15
+   Removed 7 at (0,7) - Total: 16
+   Removed 8 at (5,6) - Total: 17
+   Removed 5 at (0,2) - Total: 18
+   Removed 6 at (1,7) - Total: 19
+   Removed 8 at (1,2) - Total: 20
 ✅ Phase 3 completed! Removed: 20
 
 ✅ SUCCESS! Sudoku generated
 
 ┌───────┬───────┬───────┐
-│ * 8 * │ * 7 4 │ * * * │
-│ * * * │ 2 * * │ * * 3 │
-│ 5 4 3 │ * * * │ * * * │
+│ * * * │ * * * │ * * 9 │
+│ * 3 * │ * 5 4 │ 1 * * │
+│ * * * │ 2 * 1 │ 5 * * │
 ├───────┼───────┼───────┤
-│ * 7 4 │ * * * │ * 4 7 │
-│ 6 * 1 │ * * * │ * 6 9 │
-│ 2 * * │ * * 3 │ * 6 9 │
+│ * * * │ * * * │ 3 * * │
+│ * 8 * │ 5 * * │ * * 6 │
+│ 4 * 2 │ 1 * * │ * 5 * │
 ├───────┼───────┼───────┤
-│ * 1 * │ * * 6 │ * * * │
-│ 3 * * │ * * * │ * * 8 │
-│ * * 7 │ * 9 * │ 5 * 4 │
+│ * * * │ * * * │ 9 * 3 │
+│ * 7 1 │ * 3 * │ * 8 * │
+│ * 5 9 │ 8 * 2 │ * 4 1 │
 └───────┴───────┴───────┘
-📊 Empty cells: 55 | Filled cells: 26
+📊 Empty cells: 53 | Filled cells: 28
 
 🎉 VERIFIED! The puzzle is valid
 ```
@@ -189,9 +227,9 @@ int main() {
 Modify the `PHASE3_TARGET` constant in `main.c`:
 
 ```c
-#define PHASE3_TARGET 20  // Easy (~35 empty cells)
-#define PHASE3_TARGET 30  // Medium (~45 empty cells)
-#define PHASE3_TARGET 40  // Hard (~55 empty cells)
+#define PHASE3_TARGET 5  // Easy (~35 empty cells)
+#define PHASE3_TARGET 15  // Medium (~45 empty cells)
+#define PHASE3_TARGET 25  // Hard (~55 empty cells)
 ```
 
 ## 🧠 How It Works
@@ -368,7 +406,7 @@ sudoku_en_c/
 
 ## 🗺️ Roadmap
 
-### ✅ Version 2.0 (Current)
+### ✅ Version 2.1 (Current)
 - [x] Complete Sudoku generation
 - [x] 3-phase elimination system
 - [x] Unique solution verification

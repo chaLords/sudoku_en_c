@@ -59,7 +59,7 @@ bin/
 obj/
 debug/
 release/
-
+experiment/
 # IDEs y editores
 .vscode/
 .idea/
