@@ -505,11 +505,15 @@ bool validateSudoku(int sudoku[SIZE][SIZE]) {
 // ═══════════════════════════════════════════════════════════════════
 
 int main() {
+    // Configure encoding based on operating system
+    #ifdef _WIN32
+        system("chcp 65001 > nul");  // UTF-8 on Windows
+    #endif
     // Initialize random seed
     srand(time(NULL));
     
     printf("═══════════════════════════════════════════════════════════════\n");
-    printf("        SUDOKU GENERATOR v2.1.0 - HYBRID METHOD\n");
+    printf("        SUDOKU GENERATOR v2.1.1 - HYBRID METHOD\n");
     printf("           Fisher-Yates + Backtracking + 3 Phases\n");
     printf("═══════════════════════════════════════════════════════════════\n\n");
     

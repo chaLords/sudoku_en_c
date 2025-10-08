@@ -12,6 +12,7 @@
 - [Demo](#-demo)
 - [Installation](#-installation)
 - [Usage](#-usage)
+- [Cross-Platform Compatibility](#-cross-platform-compatibility)
 - [How It Works](#-how-it-works)
 - [Algorithms](#-algorithms)
 - [Code Structure](#-code-structure)
@@ -31,6 +32,7 @@
 - ✅ **Visual console interface** with box-drawing characters
 - ✅ **3-phase elimination system** to create playable puzzles
 - ✅ **Unique solution verification**
+- ✅ **Compatible with Linux, macOS, and Windows** (automatic UTF-8 configuration)
 
 ## 🎯 Demo
 
@@ -38,7 +40,7 @@
 
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.1.0 - HYBRID METHOD
+        SUDOKU GENERATOR v2.1.1 - HYBRID METHOD
            Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
@@ -175,6 +177,8 @@ cd sudoku_en_c
 
 ### Compile
 
+#### 🐧 **Linux / macOS**
+
 ```bash
 # Simple compilation
 gcc main.c -o sudoku
@@ -186,12 +190,32 @@ gcc -O2 main.c -o sudoku
 gcc -Wall -Wextra main.c -o sudoku
 ```
 
+#### 🪟 **Windows (VS Code / MinGW / MSYS2)**
+
+```bash
+# Compilation with UTF-8 support
+gcc -g main.c -o sudoku.exe -fexec-charset=UTF-8
+
+# Or simply (program auto-configures itself)
+gcc main.c -o sudoku.exe
+```
+
+**Note:** The program automatically detects Windows and configures UTF-8 at runtime. No additional configuration needed.
+
 ## 🚀 Usage
 
 ### Basic Execution
 
+#### 🐧 Linux / macOS
 ```bash
 ./sudoku
+```
+
+#### 🪟 Windows
+```bash
+sudoku.exe
+# or simply:
+./sudoku.exe
 ```
 
 The program will automatically generate a playable Sudoku puzzle and display:
@@ -227,10 +251,81 @@ int main() {
 Modify the `PHASE3_TARGET` constant in `main.c`:
 
 ```c
-#define PHASE3_TARGET 5  // Easy (~35 empty cells)
+#define PHASE3_TARGET 5   // Easy (~35 empty cells)
 #define PHASE3_TARGET 15  // Medium (~45 empty cells)
 #define PHASE3_TARGET 25  // Hard (~55 empty cells)
 ```
+
+## 🌍 Cross-Platform Compatibility
+
+### ✅ Automatic UTF-8 Configuration
+
+The program automatically detects the operating system and configures the correct encoding:
+
+```c
+int main() {
+    // Configure encoding based on operating system
+    #ifdef _WIN32
+        system("chcp 65001 > nul");  // UTF-8 on Windows
+    #endif
+    
+    // ... rest of code
+}
+```
+
+### 📝 What Does This Mean?
+
+- **🐧 Linux/macOS:** The code compiles without Windows-specific lines. No overhead, no changes.
+- **🪟 Windows:** The code automatically configures UTF-8 to properly display special characters (═, │, ┌, etc.).
+
+### 🔧 Troubleshooting on Windows
+
+#### Problem: Corrupted characters (�������)
+
+**Cause:** Windows terminal using incorrect encoding.
+
+**Automatic Solution:** The program auto-configures on execution. You don't need to do anything.
+
+**Manual Solution (if still fails):**
+
+1. **In VS Code Terminal:**
+   - Open `settings.json` (Ctrl+Shift+P → "Preferences: Open Settings (JSON)")
+   - Add:
+   ```json
+   {
+       "terminal.integrated.defaultProfile.windows": "Command Prompt",
+       "terminal.integrated.profiles.windows": {
+           "Command Prompt": {
+               "path": "C:\\Windows\\System32\\cmd.exe",
+               "args": ["/K", "chcp 65001"]
+           }
+       }
+   }
+   ```
+
+2. **In PowerShell:**
+   ```powershell
+   chcp 65001
+   ./sudoku.exe
+   ```
+
+3. **In CMD:**
+   ```cmd
+   chcp 65001
+   sudoku.exe
+   ```
+
+### 📋 .gitattributes File
+
+The project includes a `.gitattributes` file to maintain line ending consistency:
+
+```
+*.c text eol=lf
+*.h text eol=lf
+*.md text eol=lf
+```
+
+This ensures the code works correctly when cloned on any operating system.
 
 ## 🧠 How It Works
 
@@ -378,9 +473,10 @@ sudoku_en_c/
 ├── README.md              # README in Spanish
 ├── README.en.md           # This file (English)
 ├── LICENSE                # Apache 2.0 License
-├── CHANGELOG.md           # Version History
+├── CHANGELOG.md           # Version history
 ├── NOTICE                 # Attribution file
 ├── .gitignore             # Files to ignore in Git
+├── .gitattributes         # Line ending normalization
 └── docs/
     ├── ALGORITHMS.md      # Detailed mathematical analysis
     └── TECHNICAL.md       # Deep technical documentation
@@ -414,6 +510,8 @@ sudoku_en_c/
 - [x] Console interface
 - [x] Complete documentation
 - [x] Fully English codebase
+- [x] Cross-platform compatibility (Linux/macOS/Windows)
+- [x] Automatic UTF-8 configuration
 
 ### 🚧 Version 2.5 (Near Future)
 - [ ] Dynamic difficulty selection
@@ -447,12 +545,13 @@ Contributions are welcome! If you want to improve the project:
 - 📝 Improve documentation
 - ⚡ Optimize algorithms
 - 🧪 Add tests
+- 🌍 Improve cross-platform compatibility
 
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-### What does this mean?
+### What Does This Mean?
 
 ✅ **You can:**
 - Use commercially

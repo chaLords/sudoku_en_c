@@ -1,0 +1,54 @@
+# Normalización de saltos de línea para compatibilidad multiplataforma
+# Asegura que todos los archivos de texto usen LF en el repositorio
+
+# Archivos de código fuente C
+*.c text eol=lf
+*.h text eol=lf
+
+# Archivos de documentación
+*.md text eol=lf
+*.txt text eol=lf
+
+# Archivos de configuración
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Makefiles (requieren tabs, no espacios)
+Makefile text eol=lf
+makefile text eol=lf
+*.mk text eol=lf
+
+# Scripts de shell
+*.sh text eol=lf
+
+# Archivos binarios (no convertir)
+*.exe binary
+*.o binary
+*.out binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.a binary
+
+# Archivos de imagen
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+
+# Archivos de video
+*.mp4 binary
+*.avi binary
+*.mov binary
+
+# Archivos comprimidos
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary

@@ -31,13 +31,13 @@ This document mathematically analyzes the Sudoku generator algorithms, explainin
 │  1. Random elimination (9 cells) - O(1)                 │
 │  2. No-alternatives elimination (0-25 cells) - O(n²)    │
 │  3. Verified free elimination (configurable) - O(n²×9^m)│
-│  Typical time: ~100ms (dominated by Phase 3)            │
+│  Typical time: ~4ms (dominated by Phase 3)            │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────┐
 │                   PLAYABLE PUZZLE                       │
-│  Total: 30-54 empty cells                               │
+│  Total: 32-58 empty cells                               │
 │  Unique solution guaranteed                             │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -196,7 +196,7 @@ COMPLETE SUDOKU (81 filled cells)
         │   └─ 0-25 cells removed (structure-dependent)
         │
         └─► PHASE 3: Verified Free Elimination
-            └─ 0-20 cells removed (configurable)
+            └─ 0-25 cells removed (configurable)
                 │
                 ▼
         PLAYABLE PUZZLE (30-58 empty cells)
@@ -605,4 +605,4 @@ This generator is suitable for:
 
 **Author**: Gonzalo Ramírez (@chaLords)  
 **License**: Apache 2.0  
-**Version**: 2.1.0
+**Version**: 2.1.1

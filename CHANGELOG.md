@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2025-10-08
+
+### 🌍 Cross-Platform Compatibility Improvements
+
+### 🎉 Added
+
+#### Windows UTF-8 Support
+- **Automatic UTF-8 configuration** for Windows systems
+  - Added `#ifdef _WIN32` preprocessor directive in `main()`
+  - Automatically executes `chcp 65001` on Windows to enable UTF-8
+  - Zero impact on Linux/macOS builds (code is conditionally compiled)
+  - Ensures proper display of Unicode box-drawing characters (═, │, ┌, ┐, etc.)
+
+#### Cross-Platform Documentation
+- **New "Cross-Platform Compatibility" section** in README.md and README.en.md
+  - Detailed compilation instructions for Windows (MinGW/MSYS2/VS Code)
+  - Troubleshooting guide for Windows character encoding issues
+  - Manual solutions for PowerShell, CMD, and VS Code terminal
+  - Explanation of automatic UTF-8 configuration
+
+#### Git Configuration
+- **Added `.gitattributes` file** for line ending normalization
+  - Ensures LF line endings for `.c`, `.h`, and `.md` files
+  - Maintains code consistency across Windows, Linux, and macOS
+  - Prevents CRLF/LF conflicts when cloning repository
+
+### 🔄 Changed
+
+#### Code Modifications
+- **Updated `main()` function** with Windows-specific UTF-8 initialization:
+  ```c
+  #ifdef _WIN32
+      system("chcp 65001 > nul");  // UTF-8 on Windows
+  #endif
+  ```
+- **No changes to Linux/macOS behavior** (maintains backward compatibility)
+
+#### Documentation Updates
+- **README.md** (Spanish):
+  - Added platform-specific compilation commands
+  - Added Windows troubleshooting section
+  - Added emojis for platform identification (🐧 Linux, 🪟 Windows)
+  - Updated installation instructions with UTF-8 compilation flag
+  - Added `.gitattributes` explanation
+
+- **README.en.md** (English):
+  - Synchronized with Spanish version
+  - Professional English translation of all new sections
+  - Same structure and content as Spanish README
+
+### 🐛 Fixed
+- **Windows character corruption** (�������) in console output
+  - Previously, box-drawing characters displayed incorrectly on Windows
+  - Now automatically configures UTF-8 encoding at runtime
+  - No manual configuration needed by users
+
+### ⚡ Optimized
+- **Zero overhead on Unix systems**
+  - Windows-specific code is conditionally compiled
+  - No performance impact on Linux/macOS
+  - Single codebase supports all platforms
+
+### 📚 Documentation
+- Comprehensive platform compatibility guide
+- Step-by-step Windows setup instructions
+- VS Code terminal configuration examples
+- Git line ending best practices
+
+### 🎯 Platform Support Status
+- ✅ **Linux**: Full support (native UTF-8)
+- ✅ **macOS**: Full support (native UTF-8)
+- ✅ **Windows**: Full support (automatic UTF-8 configuration)
+  - Tested on: Windows 10/11
+  - Compatible with: MinGW, MSYS2, VS Code, CMD, PowerShell
+
+---
+
 ## [2.1.0] - 2025-10-06
 
 ### 🌍 Full Code Internationalization
@@ -250,7 +327,8 @@ Projects using previous versions will need to update all function calls. Using s
 
 **Note**: Dates use ISO 8601 format (YYYY-MM-DD)
 
+[2.1.1]: https://github.com/chaLords/sudoku_en_c/releases/tag/v2.1.1
 [2.1.0]: https://github.com/chaLords/sudoku_en_c/releases/tag/v2.1.0
 [2.0.0]: https://github.com/chaLords/sudoku_en_c/releases/tag/v2.0.0
 [1.0.0]: https://github.com/chaLords/sudoku_en_c/releases/tag/v1.0.0
-[Unreleased]: https://github.com/chaLords/sudoku_en_c/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/chaLords/sudoku_en_c/compare/v2.1.1...HEAD
