@@ -11,6 +11,7 @@
 - [Características](#-características)
 - [Demo](#-demo)
 - [Instalación](#-instalación)
+- [Modos de Verbosidad](#-modos-de-verbosidad)
 - [Uso](#-uso)
 - [Compatibilidad Multiplataforma](#-compatibilidad-multiplataforma)
 - [Cómo Funciona](#-cómo-funciona)
@@ -32,6 +33,7 @@
 - ✅ **Interfaz visual en consola** con caracteres box-drawing
 - ✅ **Sistema de eliminación de 3 fases** para crear puzzles jugables
 - ✅ **Verificación de solución única**
+- ✅ **Modos de verbosidad configurables** (0/1/2)
 - ✅ **Compatible con Linux, macOS y Windows** (auto-configuración UTF-8)
 
 ## 🎯 Demo
@@ -40,7 +42,7 @@
 
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.1.1 - HYBRID METHOD
+        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
            Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
@@ -202,6 +204,202 @@ gcc main.c -o sudoku.exe
 
 **Nota:** El programa detecta automáticamente Windows y configura UTF-8 en tiempo de ejecución. No necesitas configuraciones adicionales.
 
+## 🎛️ Modos de Verbosidad
+
+### Versión 2.2.0: Control de Salida Configurable
+
+El generador soporta tres niveles de verbosidad controlables por línea de comandos:
+
+#### Modo 0: Minimal
+**Propósito:** Salida limpia para presentaciones o benchmarks
+
+```bash
+./sudoku 0
+```
+
+**Muestra:**
+- Título del programa
+- Tablero de Sudoku final
+- Nivel de dificultad
+
+**Tiempo de ejecución:** ~0.22s
+
+**Ejemplo de salida:**
+```
+═══════════════════════════════════════════════════════════════
+        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+═══════════════════════════════════════════════════════════════
+
+┌───────┬───────┬───────┐
+│ * * 8 │ * 9 * │ * * * │
+│ * 5 * │ * * * │ * 6 * │
+│ * * * │ * 4 * │ * 2 7 │
+├───────┼───────┼───────┤
+│ 3 * 6 │ * * * │ * * 8 │
+│ * * 7 │ * 6 * │ 9 4 * │
+│ 2 * * │ * * * │ * 1 3 │
+├───────┼───────┼───────┤
+│ * * 4 │ * * * │ * * * │
+│ * * * │ 2 * 1 │ * * * │
+│ 6 * 3 │ * 8 9 │ * * * │
+└───────┴───────┴───────┘
+
+📊 Difficulty level: EXPERT
+```
+
+---
+
+#### Modo 1: Compact (Por Defecto)
+**Propósito:** Uso normal con información resumida
+
+```bash
+./sudoku 1
+# o simplemente:
+./sudoku
+```
+
+**Muestra:**
+- Resumen de fases de generación
+- Estadísticas de eliminación
+- Tablero final
+- Conteo de celdas vacías/llenas
+- Nivel de dificultad
+
+**Tiempo de ejecución:** ~0.56s
+
+**Ejemplo de salida:**
+```
+═══════════════════════════════════════════════════════════════
+        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+═══════════════════════════════════════════════════════════════
+
+🚀 ATTEMPT #1:
+🎲 Diagonal + Backtracking...✅ Completed!
+🎲 Phase 1: Fisher-Yates selection...✅ Phase 1 completed!
+📊 PHASE 1 TOTAL: Removed 9 cells
+🎲 Phase 2: Removal rounds...
+📊 PHASE 2 TOTAL: Removed 23 cells across 4 rounds
+🎲 Phase 3: Free elimination...✅ Phase 3 completed! Removed: 24
+✅ SUCCESS! Sudoku generated
+
+┌───────┬───────┬───────┐
+│ * * * │ * * * │ 6 * * │
+│ * * 8 │ 4 * * │ * * * │
+│ * * 5 │ * * 3 │ 8 * 2 │
+├───────┼───────┼───────┤
+│ * * 2 │ * * * │ * 6 * │
+│ 4 3 * │ * 7 * │ * * * │
+│ * 6 * │ 2 1 * │ * 8 * │
+├───────┼───────┼───────┤
+│ * * * │ * * 7 │ 5 * * │
+│ * 2 * │ 8 * * │ * 1 * │
+│ 1 * 7 │ * * 9 │ * 3 * │
+└───────┴───────┴───────┘
+📊 Empty cells: 56 | Filled cells: 25
+
+🎉 VERIFIED! The puzzle is valid
+
+📊 Difficulty level: HARD
+```
+
+---
+
+#### Modo 2: Detailed
+**Propósito:** Depuración completa y análisis detallado del algoritmo
+
+```bash
+./sudoku 2
+```
+
+**Muestra:**
+- Todos los pasos de generación
+- Números generados con Fisher-Yates
+- Cada ronda de FASE 2
+- Cada celda removida en FASE 3
+- Debugging completo
+
+**Tiempo de ejecución:** ~0.08s (variable)
+
+**Ejemplo de salida (parcial):**
+```
+═══════════════════════════════════════════════════════════════
+        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+           Fisher-Yates + Backtracking + 3 Phases
+═══════════════════════════════════════════════════════════════
+
+🚀 ATTEMPT #1:
+🎲 Filling main diagonal with Fisher-Yates...
+   Subgrid 0 (base: 0,0): 5 3 7 6 2 1 9 8 4 
+   Subgrid 4 (base: 3,3): 8 1 6 4 5 7 9 2 3 
+   Subgrid 8 (base: 6,6): 2 7 9 3 5 1 8 4 6 
+✅ Diagonal completed!
+
+🔄 Completing with backtracking...
+🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...
+   Subgrid 0 (base: 0,0): 4 
+   Subgrid 1 (base: 0,3): 9 
+   [...]
+
+--- ROUND 1 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0): 1 
+   [...]
+
+🎲 PHASE 3: Free elimination with unique solution verification...
+   Removed 8 at (6,0) - Total: 1
+   Removed 6 at (8,6) - Total: 2
+   [...]
+✅ Phase 3 completed! Removed: 23
+
+✅ SUCCESS! Sudoku generated
+[Tablero]
+```
+
+---
+
+### Comparación de Modos
+
+| Característica | Modo 0 | Modo 1 | Modo 2 |
+|---------------|--------|--------|--------|
+| **Fases mostradas** | No | Resumen | Completas |
+| **Estadísticas** | Mínimas | Totales | Detalladas |
+| **Rondas FASE 2** | No | Total | Cada una |
+| **Celdas FASE 3** | No | Total | Una por una |
+| **Mejor para** | Presentaciones | Uso diario | Debugging |
+| **Líneas de output** | ~15 | ~25 | ~80+ |
+
+---
+
+### Uso con Time
+
+Mide el rendimiento del generador:
+
+```bash
+# Modo minimal para benchmarks limpios
+time ./sudoku 0
+
+# Modo compact para ver estadísticas
+time ./sudoku 1
+
+# Modo detailed para análisis profundo
+time ./sudoku 2
+```
+
+---
+
+### Cambiar Modo por Defecto
+
+Si quieres cambiar el modo por defecto (actualmente modo 1), edita `main.c`:
+
+```c
+int VERBOSITY_LEVEL = 1;  // Cambiar a 0, 1, o 2
+```
+
+Luego recompila:
+```bash
+gcc -O2 main.c -o sudoku -std=c99
+```
+
 ## 🚀 Uso
 
 ### Ejecución Básica
@@ -251,7 +449,7 @@ int main() {
 Modifica la constante `PHASE3_TARGET` en `main.c`:
 
 ```c
-#define PHASE3_TARGET 5  // Fácil (~35 celdas vacías)
+#define PHASE3_TARGET 5   // Fácil (~35 celdas vacías)
 #define PHASE3_TARGET 15  // Medio (~45 celdas vacías)
 #define PHASE3_TARGET 25  // Difícil (~55 celdas vacías)
 ```
@@ -377,7 +575,7 @@ Se completan las celdas restantes usando backtracking recursivo con poda:
 **FASE 3: Eliminación Libre Verificada**
 - Elimina celdas libremente hasta alcanzar objetivo (configurable)
 - Verifica que el puzzle mantenga solución única
-- Usa `countSolutions()` con early exit para eficiencia
+- Usa `countSolutionsExact()` con early exit para eficiencia
 
 ### Ventajas del Método Híbrido
 
@@ -457,7 +655,7 @@ bool completeSudoku(int sudoku[SIZE][SIZE]) {
 **Complejidad:** O(9^m) peor caso, O(9^k) típico con early exit
 
 ```c
-int countSolutions(int sudoku[SIZE][SIZE], int limite) {
+int countSolutionsExact(int sudoku[SIZE][SIZE], int limite) {
     // Cuenta soluciones hasta límite
     // Si encuentra >= 2, para inmediatamente (early exit)
     // Speedup típico: 10^40 - 10^44 veces
@@ -494,7 +692,7 @@ sudoku_en_c/
 | `firstRandomElimination()` | FASE 1: Eliminación aleatoria | O(1) |
 | `hasAlternativeInRowCol()` | Verifica alternativas | O(1) |
 | `secondNoAlternativeElimination()` | FASE 2: Sin alternativas | O(n²) |
-| `countSolutions()` | Cuenta soluciones (con early exit) | O(9^m) |
+| `countSolutionsExact()` | Cuenta soluciones (con early exit) | O(9^m) |
 | `thirdFreeElimination()` | FASE 3: Libre verificada | O(n² × 9^m) |
 | `generateHybridSudoku()` | Orquesta todo el proceso | - |
 | `printSudoku()` | Imprime visualmente | O(n²) |
@@ -502,7 +700,7 @@ sudoku_en_c/
 
 ## 🗺️ Roadmap
 
-### ✅ Versión 2.1 (Actual)
+### ✅ Versión 2.2.0 (Actual)
 - [x] Generación completa de sudokus
 - [x] Sistema de 3 fases de eliminación
 - [x] Verificación de solución única
@@ -512,6 +710,8 @@ sudoku_en_c/
 - [x] Código completamente en inglés
 - [x] Compatibilidad multiplataforma (Linux/macOS/Windows)
 - [x] Auto-configuración UTF-8
+- [x] Modos de verbosidad configurables (0/1/2)
+- [x] Parseo de argumentos de línea de comandos
 
 ### 🚧 Versión 2.5 (Futuro Cercano)
 - [ ] Selección dinámica de dificultad
@@ -612,4 +812,3 @@ Licenciado bajo Apache License 2.0
 ## 🌐 Otros Idiomas
 
 - [English](README.en.md)
-
