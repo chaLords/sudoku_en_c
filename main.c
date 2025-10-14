@@ -6,6 +6,7 @@
 
 /*
  * Sudoku Generator - Hybrid Fisher-Yates + Backtracking
+ * Version 2.2.1 - Structure-Based Refactoring
  * 
  * Copyright 2025 Gonzalo Ramírez (@chaLords)
  * 
@@ -27,115 +28,231 @@
  * 
  * DISPLAY MODES:
  * 0 = MINIMAL    - Only title and sudoku with difficulty
- * 1 = COMPACT    - Main phases summarized + sudoku + statistics
- * 2 = DETAILED   - All complete information (full output)
+ * 1 = COMPACT    - Main phases summarized + sudoku + statistics (default)
+ * 2 = DETAILED   - All complete information (full debugging output)
  * 
- * INSTRUCTIONS:
- * Change the VERBOSITY_LEVEL value as needed:
+ * USAGE:
+ * Change the VERBOSITY_LEVEL value as needed, or pass as command line argument:
  * - For clean presentations: use 0
  * - For development/testing: use 1
  * - For complete debugging: use 2
+ * 
+ * Examples:
+ *   ./sudoku 0    - Minimal output
+ *   ./sudoku 1    - Compact output (default)
+ *   ./sudoku 2    - Detailed debugging output
  */
 
 #define SIZE 9
-#define PHASE3_TARGET 25  // Constant for phase 3
-int VERBOSITY_LEVEL = 1;  // <-- CHANGE THIS: 0, 1, or 2
+#define SUBGRID_SIZE 3
+#define TOTAL_CELLS (SIZE * SIZE)
+#define PHASE3_TARGET 25
 
 // ═══════════════════════════════════════════════════════════════════
-//                         GLOBAL CONSTANTS
+//                    DATA STRUCTURES
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * All 9 subgrid indices in a standard Sudoku
- * Used for cell elimination phases
+ * Structure: Position
+ * Represents a position (row, column) on the board
+ * Purpose: Avoids passing multiple row/col parameters separately
  */
-static const int ALL_SUBGRIDS[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+typedef struct {
+    int row;
+    int col;
+} Position;
 
 /**
- * Diagonal subgrids (0, 4, 8) that don't share rows/columns
- * Used for independent Fisher-Yates filling
+ * Structure: SudokuBoard
+ * Encapsulates the 9x9 board and its metadata
+ * Advantage: All operations work on this single structure
  */
-static const int DIAGONAL_SUBGRIDS[3] = {0, 4, 8};
+typedef struct {
+    int cells[SIZE][SIZE];  // The board itself
+    int clues;              // Number of clues (filled cells)
+    int empty;              // Number of empty cells
+} SudokuBoard;
 
+/**
+ * Structure: SubGrid
+ * Defines a 3x3 region of the board
+ * Includes: index, base position, and access method
+ */
+typedef struct {
+    int index;          // 0-8, subgrid index
+    Position base;      // Top-left corner
+} SubGrid;
+
+/**
+ * Structure: GenerationStats
+ * Stores statistics from the generation process
+ */
+typedef struct {
+    int phase1_removed;
+    int phase2_removed;
+    int phase2_rounds;
+    int phase3_removed;
+    int total_attempts;
+} GenerationStats;
+
+// ═══════════════════════════════════════════════════════════════════
+//                    GLOBAL CONSTANTS
+// ═══════════════════════════════════════════════════════════════════
+
+static const int DIAGONAL_INDICES[3] = {0, 4, 8};
+static const int ALL_INDICES[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+
+int VERBOSITY_LEVEL = 1;
 // ═══════════════════════════════════════════════════════════════════
 //                    FORWARD DECLARATIONS
 // ═══════════════════════════════════════════════════════════════════
 
-// Basic utilities
-void fisherYatesShuffle(int *array, int size, int num_in);
+// Initialization functions
+void initBoard(SudokuBoard *board);
+void updateBoardStats(SudokuBoard *board);
+SubGrid createSubGrid(int index);
+Position getPositionInSubGrid(const SubGrid *sg, int cell_index);
 
-// Verification functions
-bool isSafePosition(int sudoku[SIZE][SIZE], int row, int col, int num);
-bool findEmptyCell(int sudoku[SIZE][SIZE], int *row, int *col);
-bool hasMultipleSolutions(int sudoku[SIZE][SIZE]);
-int countSolutionsExact(int sudoku[SIZE][SIZE], int limit);
+// Fisher-Yates algorithm
+void fisherYatesShuffle(int *array, int size, int start_value);
+
+// Validation functions
+bool isSafePosition(const SudokuBoard *board, const Position *pos, int num);
+bool findEmptyCell(const SudokuBoard *board, Position *pos);
+int countSolutionsExact(SudokuBoard *board, int limit);
 
 // Sudoku generation
-void fillDiagonal(int sudoku[SIZE][SIZE]);
-bool completeSudoku(int sudoku[SIZE][SIZE]);
+void fillSubGrid(SudokuBoard *board, const SubGrid *sg);
+void fillDiagonal(SudokuBoard *board);
+bool completeSudoku(SudokuBoard *board);
 
 // Cell elimination phases
-int firstRandomElimination(int sudoku[SIZE][SIZE], const int *subgrid);
-bool hasAlternativeInRowCol(int sudoku[SIZE][SIZE], int row, int col, int num);
-int secondNoAlternativeElimination(int sudoku[SIZE][SIZE], const int *subgrid);
-int thirdFreeElimination(int sudoku[SIZE][SIZE], int objetivo);
+bool hasAlternative(SudokuBoard *board, const Position *pos, int num);
+int phase1Elimination(SudokuBoard *board, const int *indices, int count);
+int phase2Elimination(SudokuBoard *board, const int *indices, int count);
+int phase3Elimination(SudokuBoard *board, int target);
 
-// Main generation and utilities
-bool generateHybridSudoku(int sudoku[SIZE][SIZE]);
-void printSudoku(int sudoku[SIZE][SIZE]);
-bool validateSudoku(int sudoku[SIZE][SIZE]);
-const char* evaluarDificultad(int sudoku[SIZE][SIZE]);
+// Main generation function
+bool generateSudoku(SudokuBoard *board, GenerationStats *stats);
+
+// Utilities and visualization
+const char* evaluateDifficulty(const SudokuBoard *board);
+void printBoard(const SudokuBoard *board);
+bool validateBoard(const SudokuBoard *board);
 
 // ═══════════════════════════════════════════════════════════════════
-//                    1. BASIC UTILITIES
+//                    INITIALIZATION FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Generates a random permutation using Fisher-Yates
- * @param array: Array to fill
- * @param size: Array size
- * @param num_in: Starting number (usually 1)
+ * Initializes an empty board
+ * Pointer usage: Modifies the board directly without copying
  */
-void fisherYatesShuffle(int *array, int size, int num_in) {
-    // Fill array consecutively
+void initBoard(SudokuBoard *board) {
+    for(int i = 0; i < SIZE; i++) {
+        for(int j = 0; j < SIZE; j++) {
+            board->cells[i][j] = 0;
+        }
+    }
+    board->clues = 0;
+    board->empty = TOTAL_CELLS;
+}
+
+/**
+ * Updates the clue and empty cell counters
+ */
+void updateBoardStats(SudokuBoard *board) {
+    int count = 0;
+    for(int i = 0; i < SIZE; i++) {
+        for(int j = 0; j < SIZE; j++) {
+            if(board->cells[i][j] != 0) count++;
+        }
+    }
+    board->clues = count;
+    board->empty = TOTAL_CELLS - count;
+}
+
+/**
+ * Creates a SubGrid from an index (0-8)
+ * Automatically calculates the base position
+ */
+SubGrid createSubGrid(int index) {
+    SubGrid sg;
+    sg.index = index;
+    sg.base.row = (index / 3) * 3;
+    sg.base.col = (index % 3) * 3;
+    return sg;
+}
+
+/**
+ * Gets a Position within a SubGrid
+ * @param sg: The subgrid
+ * @param cell_index: index 0-8 within the subgrid
+ */
+Position getPositionInSubGrid(const SubGrid *sg, int cell_index) {
+    Position pos;
+    pos.row = sg->base.row + (cell_index / 3);
+    pos.col = sg->base.col + (cell_index % 3);
+    return pos;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    FISHER-YATES ALGORITHM
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Shuffles an array using Fisher-Yates algorithm
+ * Parameters:
+ * - array: pointer to the array to shuffle (modifies in-place)
+ * - size: array size
+ * - start_value: initial value to fill (usually 1)
+ */
+void fisherYatesShuffle(int *array, int size, int start_value) {
+    // Fill consecutively
     for(int i = 0; i < size; i++) {
-        array[i] = num_in + i;
+        array[i] = start_value + i;
     }
     
-    // Shuffle (Fisher-Yates)
-    for(int i = size-1; i > 0; i--) {
+    // Shuffle (Fisher-Yates backward)
+    for(int i = size - 1; i > 0; i--) {
         int j = rand() % (i + 1);
-        int temp = array[i];
-        array[i] = array[j];
-        array[j] = temp;
+        // Swap using XOR arithmetic (educational alternative)
+        if(i != j) {
+            array[i] ^= array[j];
+            array[j] ^= array[i];
+            array[i] ^= array[j];
+        }
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    2. VERIFICATION FUNCTIONS
+//                    VALIDATION FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * Checks if it's safe to place a number at a position
- * @return true if valid, false if there's a conflict
+ * const usage: The board is not modified in this function
  */
-bool isSafePosition(int sudoku[SIZE][SIZE], int row, int col, int num) {
+bool isSafePosition(const SudokuBoard *board, const Position *pos, int num) {
     // Check row
     for(int x = 0; x < SIZE; x++) {
-        if(sudoku[row][x] == num) return false;
+        if(board->cells[pos->row][x] == num) return false;
     }
     
     // Check column
     for(int x = 0; x < SIZE; x++) {
-        if(sudoku[x][col] == num) return false;
+        if(board->cells[x][pos->col] == num) return false;
     }
     
     // Check 3x3 subgrid
-    int rowStart = row - row % 3;
-    int colStart = col - col % 3;
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 3; j++) {
-            if(sudoku[i + rowStart][j + colStart] == num) return false;
+    int rowStart = pos->row - (pos->row % SUBGRID_SIZE);
+    int colStart = pos->col - (pos->col % SUBGRID_SIZE);
+    
+    for(int i = 0; i < SUBGRID_SIZE; i++) {
+        for(int j = 0; j < SUBGRID_SIZE; j++) {
+            if(board->cells[rowStart + i][colStart + j] == num) {
+                return false;
+            }
         }
     }
     
@@ -143,37 +260,16 @@ bool isSafePosition(int sudoku[SIZE][SIZE], int row, int col, int num) {
 }
 
 /**
- * Finds the next empty cell (with value 0)
- * @param row: Pointer to store found row
- * @param col: Pointer to store found column
- * @return true if empty cell found, false if complete
+ * Finds the first empty cell
+ * @param board: board to inspect (const because it's not modified)
+ * @param pos: pointer where to store the found position
+ * @return: true if empty cell found, false if complete
  */
-bool findEmptyCell(int sudoku[SIZE][SIZE], int *row, int *col) {
-    for(*row = 0; *row < SIZE; (*row)++) {
-        for(*col = 0; *col < SIZE; (*col)++) {
-            if(sudoku[*row][*col] == 0) return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Searches for cells with multiple candidates
- * This heuristic checks if any empty cell has more than one valid number,
- * indicating potential multiple solutions
- */
-bool hasMultipleSolutions(int sudoku[SIZE][SIZE]) {
-    /// Search for cells with multiple candidates
-    for(int r = 0; r < SIZE; r++) {
-        for(int c = 0; c < SIZE; c++) {
-            if(sudoku[r][c] == 0) {
-                int candidates = 0;
-                for(int num = 1; num <= 9; num++) {
-                    if(isSafePosition(sudoku, r, c, num)) {
-                        candidates++;
-                        if(candidates > 1) return true;  // Early exit
-                    }
-                }
+bool findEmptyCell(const SudokuBoard *board, Position *pos) {
+    for(pos->row = 0; pos->row < SIZE; pos->row++) {
+        for(pos->col = 0; pos->col < SIZE; pos->col++) {
+            if(board->cells[pos->row][pos->col] == 0) {
+                return true;
             }
         }
     }
@@ -182,35 +278,29 @@ bool hasMultipleSolutions(int sudoku[SIZE][SIZE]) {
 
 /**
  * Counts solutions using exhaustive backtracking
- * @param sudoku: The board to analyze
- * @param limit: Stop counting after finding this many solutions (usually 2)
- * @return Number of solutions found (capped at limit)
+ * Stops searching after finding 'limit' solutions
  */
-int countSolutionsExact(int sudoku[SIZE][SIZE], int limit) {
-    int row, col;
+int countSolutionsExact(SudokuBoard *board, int limit) {
+    Position pos;
     
-    // Base case: if no empty cells, we found a complete solution
-    if(!findEmptyCell(sudoku, &row, &col)) {
-        return 1;
+    if(!findEmptyCell(board, &pos)) {
+        return 1; // Complete solution found
     }
     
     int totalSolutions = 0;
     
-    // Try each number from 1 to 9
-    for(int num = 1; num <= 9; num++) {
-        if(isSafePosition(sudoku, row, col, num)) {
-            sudoku[row][col] = num;
+    for(int num = 1; num <= SIZE; num++) {
+        if(isSafePosition(board, &pos, num)) {
+            board->cells[pos.row][pos.col] = num;
             
-            // Recursively count solutions
-            totalSolutions += countSolutionsExact(sudoku, limit);
+            totalSolutions += countSolutionsExact(board, limit);
             
-            // Early exit optimization: if we already found multiple solutions, stop
             if(totalSolutions >= limit) {
-                sudoku[row][col] = 0;
+                board->cells[pos.row][pos.col] = 0;
                 return totalSolutions;
             }
             
-            sudoku[row][col] = 0;  // Backtrack
+            board->cells[pos.row][pos.col] = 0;
         }
     }
     
@@ -218,86 +308,82 @@ int countSolutionsExact(int sudoku[SIZE][SIZE], int limit) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    3. SUDOKU GENERATION
+//                    SUDOKU GENERATION
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Fills the main diagonal subgrids (0, 4, 8)
- * These don't interfere with each other, allowing independent filling
+ * Fills a specific subgrid with Fisher-Yates
  */
-void fillDiagonal(int sudoku[SIZE][SIZE]) {
+void fillSubGrid(SudokuBoard *board, const SubGrid *sg) {
+    int numbers[SIZE];
+    fisherYatesShuffle(numbers, SIZE, 1);
+    
     if(VERBOSITY_LEVEL == 2) {
-        printf("🎲 Filling main diagonal with Fisher-Yates...\n");
+        printf("   SubGrid %d (base: %d,%d): ", 
+               sg->index, sg->base.row, sg->base.col);
+    }
+    
+    for(int i = 0; i < SIZE; i++) {
+        Position pos = getPositionInSubGrid(sg, i);
+        board->cells[pos.row][pos.col] = numbers[i];
+        
+        if(VERBOSITY_LEVEL == 2) {
+            printf("%d ", numbers[i]);
+        }
+    }
+    
+    if(VERBOSITY_LEVEL == 2) {
+        printf("\n");
+    }
+}
+
+/**
+ * Fills the diagonal subgrids (0, 4, 8)
+ * These are independent and don't have conflicts with each other
+ */
+void fillDiagonal(SudokuBoard *board) {
+    if(VERBOSITY_LEVEL == 2) {
+        printf("🎲 Filling diagonal with Fisher-Yates...\n");
     } else if(VERBOSITY_LEVEL == 1) {
         printf("🎲 Diagonal + Backtracking...");
         fflush(stdout);
     }
     
-    int random[SIZE];
-    
-    for(int idx = 0; idx < 3; idx++) {
-        int grid = DIAGONAL_SUBGRIDS[idx];
-        fisherYatesShuffle(random, SIZE, 1);
-        
-        int initial_row = (grid/3) * 3;
-        int initial_column = (grid%3) * 3;
-        
-        if(VERBOSITY_LEVEL == 2) {
-            printf("   Subgrid %d (base: %d,%d): ", grid, initial_row, initial_column);
-        }
-        
-        for(int i = 0; i < SIZE; i++) {
-            int row = initial_row + (i/3);
-            int col = initial_column + (i%3);
-            sudoku[row][col] = random[i];
-            
-            if(VERBOSITY_LEVEL == 2) {
-                printf("%d ", random[i]);
-            }
-        }
-        
-        if(VERBOSITY_LEVEL == 2) {
-            printf("\n");
-        }
+    for(int i = 0; i < 3; i++) {
+        SubGrid sg = createSubGrid(DIAGONAL_INDICES[i]);
+        fillSubGrid(board, &sg);
     }
     
     if(VERBOSITY_LEVEL == 2) {
-        printf("✅ Diagonal completed!\n\n");
+        printf("✅ Diagonal successfully filled!\n\n");
     }
 }
 
 /**
- * Completes the sudoku using recursive backtracking
- * @return true if successfully completed, false if no solution
+ * Completes the board using recursive backtracking
  */
-bool completeSudoku(int sudoku[SIZE][SIZE]) {
-    int row, col;
+bool completeSudoku(SudokuBoard *board) {
+    Position pos;
     
-    if(!findEmptyCell(sudoku, &row, &col)) {
-        return true;
+    if(!findEmptyCell(board, &pos)) {
+        return true; // Complete board
     }
     
-    int numbers[9] = {1,2,3,4,5,6,7,8,9};
+    // Array of numbers to try (1-9) shuffled
+    int numbers[SIZE];
+    fisherYatesShuffle(numbers, SIZE, 1);
     
-    // Shuffle
-    for(int i = 8; i > 0; i--) {
-        int j = rand() % (i + 1);
-        int temp = numbers[i];
-        numbers[i] = numbers[j];
-        numbers[j] = temp;
-    }
-    
-    for(int i = 0; i < 9; i++) {
+    for(int i = 0; i < SIZE; i++) {
         int num = numbers[i];
         
-        if(isSafePosition(sudoku, row, col, num)) {
-            sudoku[row][col] = num;
+        if(isSafePosition(board, &pos, num)) {
+            board->cells[pos.row][pos.col] = num;
             
-            if(completeSudoku(sudoku)) {
+            if(completeSudoku(board)) {
                 return true;
             }
             
-            sudoku[row][col] = 0;
+            board->cells[pos.row][pos.col] = 0; // Backtrack
         }
     }
     
@@ -305,15 +391,66 @@ bool completeSudoku(int sudoku[SIZE][SIZE]) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    4. CELL ELIMINATION (3 PHASES)
+//                    CELL ELIMINATION (3 PHASES)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * PHASE 1: Removes one random number from each subgrid
- * Uses Fisher-Yates to choose which number (1-9) to remove from each
- * @return Number of removed cells (always 9)
+ * Checks if a number has alternatives in its row/column/subgrid
  */
-int firstRandomElimination(int sudoku[SIZE][SIZE], const int *subgrid) {
+bool hasAlternative(SudokuBoard *board, const Position *pos, int num) {
+    int temp = board->cells[pos->row][pos->col];
+    board->cells[pos->row][pos->col] = 0;
+    
+    int alternatives = 0;
+    
+    // Search in row
+    for(int x = 0; x < SIZE && alternatives == 0; x++) {
+        if(x != pos->col && board->cells[pos->row][x] == 0) {
+            Position testPos = {pos->row, x};
+            if(isSafePosition(board, &testPos, num)) {
+                alternatives++;
+            }
+        }
+    }
+    
+    // Search in column
+    for(int x = 0; x < SIZE && alternatives == 0; x++) {
+        if(x != pos->row && board->cells[x][pos->col] == 0) {
+            Position testPos = {x, pos->col};
+            if(isSafePosition(board, &testPos, num)) {
+                alternatives++;
+            }
+        }
+    }
+    
+    // Search in subgrid
+    if(alternatives == 0) {
+        int rowStart = pos->row - (pos->row % SUBGRID_SIZE);
+        int colStart = pos->col - (pos->col % SUBGRID_SIZE);
+        
+        for(int i = 0; i < SUBGRID_SIZE && alternatives == 0; i++) {
+            for(int j = 0; j < SUBGRID_SIZE && alternatives == 0; j++) {
+                int r = rowStart + i;
+                int c = colStart + j;
+                
+                if((r != pos->row || c != pos->col) && board->cells[r][c] == 0) {
+                    Position testPos = {r, c};
+                    if(isSafePosition(board, &testPos, num)) {
+                        alternatives++;
+                    }
+                }
+            }
+        }
+    }
+    
+    board->cells[pos->row][pos->col] = temp;
+    return alternatives > 0;
+}
+
+/**
+ * PHASE 1: Removes one random number from each subgrid
+ */
+int phase1Elimination(SudokuBoard *board, const int *indices, int count) {
     if(VERBOSITY_LEVEL == 2) {
         printf("🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...\n");
     } else if(VERBOSITY_LEVEL == 1) {
@@ -321,31 +458,31 @@ int firstRandomElimination(int sudoku[SIZE][SIZE], const int *subgrid) {
         fflush(stdout);
     }
     
-    int random[SIZE];
-    fisherYatesShuffle(random, SIZE, 1);
-    int removed_count = 0;
+    int numbers[SIZE];
+    fisherYatesShuffle(numbers, SIZE, 1);
+    int removed = 0;
     
-    for(int idx = 0; idx < 9; idx++) {
-        int grid = subgrid[idx];
-        int initial_row = (grid/3) * 3;
-        int initial_column = (grid%3) * 3;
+    for(int idx = 0; idx < count; idx++) {
+        SubGrid sg = createSubGrid(indices[idx]);
+        int initial_row = sg.base.row;
+        int initial_column = sg.base.col;
         
         if(VERBOSITY_LEVEL == 2) {
-            printf("   Subgrid %d (base: %d,%d): ", grid, initial_row, initial_column);
+            printf("   Subgrid %d (base: %d,%d): ", sg.index, initial_row, initial_column);
         }
+
+        int targetValue = numbers[idx];
         
-        int valueToRemove = random[idx];
-        
+        // Find and remove the target value
         for(int i = 0; i < SIZE; i++) {
-            int row = initial_row + (i/3);
-            int col = initial_column + (i%3);
+            Position pos = getPositionInSubGrid(&sg, i);
             
-            if(sudoku[row][col] == valueToRemove) {
-                sudoku[row][col] = 0;
-                removed_count++;
+            if(board->cells[pos.row][pos.col] == targetValue) {
+                board->cells[pos.row][pos.col] = 0;
+                removed++;
                 
                 if(VERBOSITY_LEVEL == 2) {
-                    printf("%d ", valueToRemove);
+                    printf("%d ", targetValue);
                 }
                 break;
             }
@@ -360,103 +497,47 @@ int firstRandomElimination(int sudoku[SIZE][SIZE], const int *subgrid) {
         printf("✅ Phase 1 completed!\n");
     }
     
-    if(VERBOSITY_LEVEL == 1) {
-        printf("📊 PHASE 1 TOTAL: Removed %d cells\n", removed_count);
+    if(VERBOSITY_LEVEL >= 1) {
+        printf("📊 PHASE 1 TOTAL: Removed %d cells\n\n", removed);
     }
     
-    return removed_count;
+    return removed;
 }
 
 /**
- * Checks if a number has alternatives in its row, column, or subgrid
- * @return true if there ARE alternatives (should not remove), false if NO alternatives (can remove)
+ * PHASE 2: Removes numbers without alternatives
  */
-bool hasAlternativeInRowCol(int sudoku[SIZE][SIZE], int row, int col, int num) {
-    int temp = sudoku[row][col];
-    sudoku[row][col] = 0;
-    
-    int possibleInRow = 0;
-    int possibleInCol = 0;
-    int possibleInSubgrid = 0;
-    
-    // Check another position in the ROW
-    for(int x = 0; x < SIZE; x++) {
-        if(x != col && sudoku[row][x] == 0) {
-            if(isSafePosition(sudoku, row, x, num)) {
-                possibleInRow++;
-            }
-        }
-    }
-    
-    // Check another position in the COLUMN
-    for(int x = 0; x < SIZE; x++) {
-        if(x != row && sudoku[x][col] == 0) {
-            if(isSafePosition(sudoku, x, col, num)) {
-                possibleInCol++;
-            }
-        }
-    }
-    
-    // Check another position in the 3x3 SUBGRID
-    int rowStart = row - row % 3;
-    int colStart = col - col % 3;
-    
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 3; j++) {
-            int f = rowStart + i;
-            int c = colStart + j;
-            
-            // Skip the original position
-            if(f == row && c == col) continue;
-            
-            if(sudoku[f][c] == 0 && isSafePosition(sudoku, f, c, num)) {
-                possibleInSubgrid++;
-            }
-        }
-    }
-    
-    sudoku[row][col] = temp; // Restore
-    
-    return (possibleInRow > 0) || (possibleInCol > 0) || (possibleInSubgrid > 0);
-}
-
-/**
- * PHASE 2: Removes numbers that have NO alternatives in their row/column/subgrid
- * Executes in a loop until no more can be removed
- * @return Number of removed values in this round
- */
-int secondNoAlternativeElimination(int sudoku[SIZE][SIZE], const int *subgrid) {
+int phase2Elimination(SudokuBoard *board, const int *indices, int count) {
     if(VERBOSITY_LEVEL == 2) {
         printf("🎲 PHASE 2: Selecting numbers without alternatives...\n");
     }
+
+    int removed = 0;
     
-    int excluded_values = 0;
-    
-    for(int idx = 0; idx < 9; idx++) {
-        int grid = subgrid[idx];
-        int initial_row = (grid/3) * 3;
-        int initial_column = (grid%3) * 3;
+    for(int idx = 0; idx < count; idx++) {
+        SubGrid sg = createSubGrid(indices[idx]);
+        int initial_row = sg.base.row;
+        int initial_column = sg.base.col;
         
         if(VERBOSITY_LEVEL == 2) {
-            printf("   Subgrid %d (base: %d,%d): ", grid, initial_row, initial_column);
+            printf("   Subgrid %d (base: %d,%d): ", sg.index, initial_row, initial_column);
         }
         
         for(int i = 0; i < SIZE; i++) {
-            int row = initial_row + (i/3);
-            int col = initial_column + (i%3);
+            Position pos = getPositionInSubGrid(&sg, i);
             
-            if(sudoku[row][col] != 0) {
-                int currentNumber = sudoku[row][col];
+            if(board->cells[pos.row][pos.col] != 0) {
+                int num = board->cells[pos.row][pos.col];
                 
-                if(!hasAlternativeInRowCol(sudoku, row, col, currentNumber)) {
-                    sudoku[row][col] = 0;
-                    
+                if(!hasAlternative(board, &pos, num)) {
+                    board->cells[pos.row][pos.col] = 0;
+
                     if(VERBOSITY_LEVEL == 2) {
-                        printf("%d ", currentNumber);
+                        printf("%d ", num);
                     }
-                    
-                    excluded_values++;
-                    break;
+
+                    removed++;
+                    break; // Only one per subgrid per round
                 }
             }
         }
@@ -467,19 +548,17 @@ int secondNoAlternativeElimination(int sudoku[SIZE][SIZE], const int *subgrid) {
     }
     
     if(VERBOSITY_LEVEL == 2) {
-        printf("✅ Phase 2 completed! Removed: %d\n\n", excluded_values);
+        printf("✅ Phase 2 completed! Removed: %d\n\n", removed);
     }
-    
-    return excluded_values;
+
+    return removed;
 }
 
 /**
- * PHASE 3: Free elimination until reaching target
- * Verifies that unique solution is maintained using countSolutions()
- * @param objetivo: Additional number of cells to empty
- * @return Number of removed values
+ * PHASE 3: Free elimination with unique solution verification
+ * Uses dynamic memory for the positions array
  */
-int thirdFreeElimination(int sudoku[SIZE][SIZE], int objetivo) {
+int phase3Elimination(SudokuBoard *board, int target) {
     if(VERBOSITY_LEVEL == 2) {
         printf("🎲 PHASE 3: Free elimination with unique solution verification...\n");
     } else if(VERBOSITY_LEVEL == 1) {
@@ -487,176 +566,159 @@ int thirdFreeElimination(int sudoku[SIZE][SIZE], int objetivo) {
         fflush(stdout);
     }
     
-    // Structure to store positions
-    typedef struct {
-        int row;
-        int col;
-    } Position;
+    // Dynamic memory for positions
+    Position *positions = (Position *)malloc(TOTAL_CELLS * sizeof(Position));
+    if(positions == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        return 0;
+    }
     
-    Position positions[81];
     int count = 0;
     
-    // Collect all positions with numbers
-    for(int f = 0; f < SIZE; f++) {
+    // Collect positions with numbers
+    for(int r = 0; r < SIZE; r++) {
         for(int c = 0; c < SIZE; c++) {
-            if(sudoku[f][c] != 0) {
-                positions[count].row = f;
+            if(board->cells[r][c] != 0) {
+                positions[count].row = r;
                 positions[count].col = c;
                 count++;
             }
         }
     }
     
-    // Shuffle positions (Fisher-Yates)
-    for(int i = count-1; i > 0; i--) {
+    // Shuffle positions
+    for(int i = count - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         Position temp = positions[i];
         positions[i] = positions[j];
         positions[j] = temp;
     }
     
+    int removed = 0;
+    
     // Try to remove in random order
-    int excluded_values = 0;
-    for(int i = 0; i < count && excluded_values < objetivo; i++) {
+    for(int i = 0; i < count && removed < target; i++) {
+        Position *pos = &positions[i];
         int row = positions[i].row;
         int col = positions[i].col;
+        int temp = board->cells[pos->row][pos->col];
         
-        int temp = sudoku[row][col];
-        sudoku[row][col] = 0; // Temporarily remove
+        board->cells[pos->row][pos->col] = 0;
         
-        // EXACT Verification: count actual solutions
-        int numSolutions = countSolutionsExact(sudoku, 2);
-        
-        if(numSolutions == 1) {
-            // Safe to remove: exactly one solution exists
-            excluded_values++;
+        if(countSolutionsExact(board, 2) == 1) {
+            removed++;
             
             if(VERBOSITY_LEVEL == 2) {
-                printf("   Removed %d at (%d,%d) - Total: %d\n", 
-                       temp, row, col, excluded_values);
+                printf("   Removed %d at memAddr: %p (%d,%d) - Total: %d\n", 
+                       temp, (void *)pos, row, col, removed);
             }
         } else {
-            sudoku[row][col] = temp; // Restore if multiple solutions
+            board->cells[pos->row][pos->col] = temp;
         }
     }
     
+    free(positions); // Free memory
+    
     if(VERBOSITY_LEVEL >= 1) {
-        printf("✅ Phase 3 completed! Removed: %d\n", excluded_values);
+        printf("✅ Phase 3 completed! Removed: %d\n", removed);
     }
     
-    return excluded_values;
+    return removed;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    5. MAIN FUNCTION
+//                    MAIN GENERATION FUNCTION
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Generates a playable sudoku using hybrid method + cell elimination
- * @return true if successfully generated, false on error
+ * Generates a playable Sudoku using the hybrid method
  */
-bool generateHybridSudoku(int sudoku[SIZE][SIZE]) {
-    // Initialize all cells with 0
-    for(int i = 0; i < SIZE; i++) {
-        for(int j = 0; j < SIZE; j++) {
-            sudoku[i][j] = 0;
-        }
-    }
+bool generateSudoku(SudokuBoard *board, GenerationStats *stats) {
+    initBoard(board);
+    memset(stats, 0, sizeof(GenerationStats));
     
-    // STEP 1: Fill main diagonal with Fisher-Yates
-    fillDiagonal(sudoku);
+    // STEP 1: Fill diagonal
+    fillDiagonal(board);
     
     // STEP 2: Complete with backtracking
     if(VERBOSITY_LEVEL == 2) {
-        printf("🔄 Completing with backtracking...\n");
+        printf("🔄 Backtracking in progress...\n");
     }
     
-    bool success = completeSudoku(sudoku);
+    if(!completeSudoku(board)) {
+        return false;
+    }
     
-    if(VERBOSITY_LEVEL >= 1 && success) {
+    if(VERBOSITY_LEVEL >= 1) {
         printf("✅ Completed!\n");
     }
     
-    if(success) {
-        // STEP 3: PHASE 1 - Remove 1 per subgrid
-        firstRandomElimination(sudoku, ALL_SUBGRIDS);
-        
-        // STEP 4: PHASE 2 - Loop of elimination without alternatives
-        if(VERBOSITY_LEVEL == 1) {
-            printf("🎲 Phase 2: Removal rounds...");
-            fflush(stdout);
-        }
-        
-        int round = 1;
-        int excluded_values;
-        int phase2_total = 0;
-        
-        do {
-            if(VERBOSITY_LEVEL == 2) {
-                printf("--- ROUND %d ---\n", round);
-            }
-            
-            excluded_values = secondNoAlternativeElimination(sudoku, ALL_SUBGRIDS);
-            phase2_total += excluded_values;
-            round++;
-        } while(excluded_values > 0);
-        
-        if(VERBOSITY_LEVEL == 2) {
-            printf("🛑 Cannot remove more numbers in PHASE 2\n\n");
-        }
-        
-        if(VERBOSITY_LEVEL == 1) {
-            printf("\n📊 PHASE 2 TOTAL: Removed %d cells across %d rounds\n", 
-                   phase2_total, round - 1);
-        } else if(VERBOSITY_LEVEL == 2) {
-            printf("📊 PHASE 2 TOTAL: Removed %d cells across %d rounds\n\n", 
-                   phase2_total, round - 1);
-        }
-        
-        // STEP 5: PHASE 3 - Free elimination until target
-        thirdFreeElimination(sudoku, PHASE3_TARGET);
+    // STEP 3: Phase 1
+    stats->phase1_removed = phase1Elimination(board, ALL_INDICES, 9);
+    
+    // STEP 4: Phase 2 (loop)
+    if(VERBOSITY_LEVEL == 1) {
+        printf("🎲 Phase 2: Removal rounds...");
+        fflush(stdout);
     }
     
-    return success;
-}
+    int round = 1;
+    int removed;
 
+    do {
+        if(VERBOSITY_LEVEL == 2) {
+            printf("--- ROUND %d ---\n", round);
+        }
+
+        removed = phase2Elimination(board, ALL_INDICES, 9);
+        stats->phase2_removed += removed;
+        if(removed > 0) stats->phase2_rounds++;
+        round++;
+
+    } while(removed > 0);
+    
+    if(VERBOSITY_LEVEL == 2) {
+        printf("🛑 Cannot remove more numbers in PHASE 2\n\n");
+    }
+    
+    if(VERBOSITY_LEVEL >= 1) {
+        printf("\n📊 PHASE 2 TOTAL: %d rounds, removed %d cells\n\n", 
+               stats->phase2_rounds, stats->phase2_removed);
+    }
+    
+    // STEP 5: Phase 3
+    stats->phase3_removed = phase3Elimination(board, PHASE3_TARGET);
+    
+    updateBoardStats(board);
+    return true;
+}
+ 
 // ═══════════════════════════════════════════════════════════════════
-//                    6. AUXILIARY FUNCTIONS
+//                    UTILITIES AND VISUALIZATION
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Evaluate difficulty based on number of clues
+ * Evaluates difficulty based on number of clues
  */
-const char* evaluarDificultad(int sudoku[SIZE][SIZE]) {
-    int pistas = 0;
-    for(int i = 0; i < SIZE; i++) {
-        for(int j = 0; j < SIZE; j++) {
-            if(sudoku[i][j] != 0) pistas++;
-        }
-    }
-    
-    if(pistas >= 45) return "EASY";
-    else if(pistas >= 35) return "MEDIUM";
-    else if(pistas >= 25) return "HARD";
+const char* evaluateDifficulty(const SudokuBoard *board) {
+    if(board->clues >= 45) return "EASY";
+    else if(board->clues >= 35) return "MEDIUM";
+    else if(board->clues >= 25) return "HARD";
     else return "EXPERT";
 }
 
 /**
- * Prints the sudoku in visual format with borders
- * Shows asterisks (*) for empty cells
+ * Prints the board with visual formatting
  */
-void printSudoku(int sudoku[SIZE][SIZE]) {
-    int asterisks = 0;
-    
+void printBoard(const SudokuBoard *board) {
     printf("┌───────┬───────┬───────┐\n");
     for(int i = 0; i < SIZE; i++) {
         printf("│");
         for(int j = 0; j < SIZE; j++) {
-            if(sudoku[i][j] == 0) {
-                printf(" *");
-                asterisks++;
+            if(board->cells[i][j] == 0) {
+                printf(" .");
             } else {
-                printf(" %d", sudoku[i][j]);
+                printf(" %d", board->cells[i][j]);
             }
             if((j + 1) % 3 == 0) printf(" │");
         }
@@ -668,52 +730,47 @@ void printSudoku(int sudoku[SIZE][SIZE]) {
     printf("└───────┴───────┴───────┘\n");
     
     if(VERBOSITY_LEVEL >= 1) {
-        printf("📊 Empty cells: %d | Filled cells: %d\n", asterisks, 81 - asterisks);
+        printf("📊 Empty: %d | Clues: %d\n", board->empty, board->clues);
     }
 }
 
 /**
- * Verifies that the sudoku is valid (no conflicts)
- * @return true if valid, false if there are errors
+ * Validates that the board has no conflicts
  */
-bool validateSudoku(int sudoku[SIZE][SIZE]) {
+bool validateBoard(const SudokuBoard *board) {
     for(int i = 0; i < SIZE; i++) {
         for(int j = 0; j < SIZE; j++) {
-            if(sudoku[i][j] == 0) continue; // Skip empty cells
+            if(board->cells[i][j] == 0) continue;
             
-            int num = sudoku[i][j];
-            sudoku[i][j] = 0; // Temporary
+            Position pos = {i, j};
+            int num = board->cells[i][j];
             
-            if(!isSafePosition(sudoku, i, j, num)) {
-                sudoku[i][j] = num; // Restore
+            // Create a temporary copy for validation
+            SudokuBoard temp = *board;
+            temp.cells[i][j] = 0;
+            
+            if(!isSafePosition(&temp, &pos, num)) {
                 return false;
             }
-            
-            sudoku[i][j] = num; // Restore
         }
     }
     return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                           7. MAIN
+//                           MAIN
 // ═══════════════════════════════════════════════════════════════════
 
 int main(int argc, char *argv[]) {
-    // Configure encoding based on operating system
     #ifdef _WIN32
         system("chcp 65001 > nul");  // UTF-8 on Windows
     #endif
     
-    // Initialize random seed
     srand(time(NULL));
     
-    // ========================================================================
-    // PARSE COMMAND LINE ARGUMENTS
-    // ========================================================================
+    // Parse arguments
     if(argc > 1) {
         int level = atoi(argv[1]);
-        
         if(level >= 0 && level <= 2) {
             VERBOSITY_LEVEL = level;
         } else {
@@ -730,71 +787,55 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    int sudoku[SIZE][SIZE];
-    bool generatedSudoku = false;
+    // Allocate memory for the board (educational: demonstrates malloc)
+    SudokuBoard *board = (SudokuBoard *)malloc(sizeof(SudokuBoard));
+    if(board == NULL) {
+        fprintf(stderr, "❌ Error: Could not allocate memory for the board\n");
+        return 1;
+    }
     
-    // ========================================================================
-    // TITLES ACCORDING TO MODE
-    // ========================================================================
-    if(VERBOSITY_LEVEL == 0) {
+    GenerationStats stats;
+    
+    // Display title based on verbosity level
+    if(VERBOSITY_LEVEL == 0 || VERBOSITY_LEVEL == 1) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD\n");
-        printf("═══════════════════════════════════════════════════════════════\n\n");
-    } else if(VERBOSITY_LEVEL == 1) {
-        printf("═══════════════════════════════════════════════════════════════\n");
-        printf("        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD\n");
+        printf("  SUDOKU GENERATOR v2.2.1 – STRUCTURE-BASED REFACTORING\n");
         printf("═══════════════════════════════════════════════════════════════\n\n");
     } else if(VERBOSITY_LEVEL == 2) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD\n");
+        printf("    SUDOKU GENERATOR v2.2.1 – STRUCTURE-BASED REFACTORING\n");
         printf("           Fisher-Yates + Backtracking + 3 Phases\n");
         printf("═══════════════════════════════════════════════════════════════\n\n");
     }
+
+    bool success = false;
     
-    // ========================================================================
-    // SUDOKU GENERATION WITH CONTROLLED VERBOSITY
-    // ========================================================================
+    // Try up to 5 attempts to generate a valid Sudoku
     for(int attempt = 1; attempt <= 5; attempt++) {
-        // Show attempt according to mode
-        if(VERBOSITY_LEVEL == 2) {
-            printf("🚀 ATTEMPT #%d:\n", attempt);
-        } else if(VERBOSITY_LEVEL == 1) {
+        if(VERBOSITY_LEVEL >= 1) {
             printf("🚀 ATTEMPT #%d:\n", attempt);
         }
         
-        if(generateHybridSudoku(sudoku)) {
-            // Success message according to mode
-            if(VERBOSITY_LEVEL == 2) {
-                printf("✅ SUCCESS! Sudoku generated\n\n");
-            } else if(VERBOSITY_LEVEL == 1) {
+        if(generateSudoku(board, &stats)) {
+            if(VERBOSITY_LEVEL >= 1) {
                 printf("✅ SUCCESS! Sudoku generated\n\n");
             }
             
-            // All modes show the sudoku
-            printSudoku(sudoku);
+            printBoard(board);
             printf("\n");
             
-            // Validation with controlled verbosity
-            if(validateSudoku(sudoku)) {
-                if(VERBOSITY_LEVEL == 2) {
-                    printf("🎉 VERIFIED! The puzzle is valid\n");
-                } else if(VERBOSITY_LEVEL == 1) {
-                    printf("🎉 VERIFIED! The puzzle is valid\n");
-                }
-            } else {
+            if(validateBoard(board)) {
                 if(VERBOSITY_LEVEL >= 1) {
-                    printf("❌ Verification error\n");
+                    printf("🎉 VERIFIED! The puzzle is valid\n");
                 }
             }
             
-            // Show difficulty (in mode 0 and 1)
-            if(VERBOSITY_LEVEL <= 1) {
-                printf("\n📊 Difficulty level: %s\n", evaluarDificultad(sudoku));
+            if(VERBOSITY_LEVEL <= 2) {
+                printf("\n📊 Difficulty level: %s\n", evaluateDifficulty(board));
             }
             
-            generatedSudoku = true;
+            success = true;
             break;
-            
         } else {
             // Only in DETAILED mode show each failure
             if(VERBOSITY_LEVEL == 2) {
@@ -803,13 +844,62 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    // ========================================================================
-    // ERROR HANDLING IF SUDOKU WAS NOT GENERATED
-    // ========================================================================
-    if(!generatedSudoku) {
-        printf("\n❌ ERROR: Could not generate a valid Sudoku after multiple attempts!\n");
+    // Free memory
+    free(board);
+    
+    if(!success) {
+        fprintf(stderr, "\n❌ ERROR: Could not generate a valid Sudoku after multiple attempts!\n");
         return 1;
     }
     
     return 0;
 }
+
+/*
+ * ═══════════════════════════════════════════════════════════════════
+ *                    EDUCATIONAL CONCEPTS APPLIED
+ * ═══════════════════════════════════════════════════════════════════
+ * 
+ * 1. STRUCTURES (struct):
+ *    - SudokuBoard: Encapsulates board + metadata
+ *    - Position: Abstracts coordinates (row, col)
+ *    - SubGrid: Represents 3x3 regions
+ *    - GenerationStats: Groups statistics
+ * 
+ * 2. TYPEDEF:
+ *    - Simplifies declarations
+ *    - Improves code readability
+ *    - Makes type names more semantic
+ * 
+ * 3. POINTERS:
+ *    - Pass by reference (avoids copies)
+ *    - Modify structures in-place
+ *    - Efficient memory access
+ *    - Demonstrates proper pointer usage with const
+ * 
+ * 4. CONST:
+ *    - Indicates read-only parameters
+ *    - Prevents accidental modifications
+ *    - Improves code semantics and safety
+ *    - Enables compiler optimizations
+ * 
+ * 5. DYNAMIC MEMORY (malloc/free):
+ *    - Flexible allocation at runtime
+ *    - Important to free memory (prevent leaks)
+ *    - Error handling for allocation failures
+ *    - Educational demonstration of heap usage
+ * 
+ * 6. MODULARITY:
+ *    - Small, specialized functions
+ *    - Code reusability
+ *    - Easier to maintain and debug
+ *    - Single Responsibility Principle
+ * 
+ * 7. ALGORITHM EFFICIENCY:
+ *    - Fisher-Yates: O(n) shuffling
+ *    - Backtracking: O(9^m) where m = empty cells
+ *    - Early exit optimizations in validation
+ *    - Pruning strategies in solution counting
+ * 
+ * ═══════════════════════════════════════════════════════════════════
+ */

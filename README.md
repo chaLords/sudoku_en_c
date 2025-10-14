@@ -3,8 +3,9 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![C](https://img.shields.io/badge/C-00599C?style=flat&logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/chaLords/sudoku_en_c)
+[![Version](https://img.shields.io/badge/version-2.2.1-brightgreen.svg)](https://github.com/chaLords/sudoku_en_c/releases)
 
-> Un generador eficiente de sudokus completos utilizando un enfoque híbrido: algoritmo Fisher-Yates para subcuadrículas independientes y backtracking para completar el resto del tablero.
+> Un generador eficiente de sudokus completos utilizando un enfoque híbrido: algoritmo Fisher-Yates para subcuadrículas independientes y backtracking para completar el resto del tablero. Ahora con arquitectura refactorizada basada en estructuras de datos.
 
 ## 📋 Tabla de Contenidos
 
@@ -35,6 +36,9 @@
 - ✅ **Verificación de solución única**
 - ✅ **Modos de verbosidad configurables** (0/1/2)
 - ✅ **Compatible con Linux, macOS y Windows** (auto-configuración UTF-8)
+- ✅ **Arquitectura refactorizada con estructuras de datos** (v2.2.1)
+- ✅ **Gestión eficiente de memoria** con punteros y malloc/free
+- ✅ **Código modular y mantenible** siguiendo principios SOLID
 
 ## 🎯 Demo
 
@@ -42,70 +46,85 @@
 
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+    SUDOKU GENERATOR v2.2.1 – STRUCTURE-BASED REFACTORING
            Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
 🚀 ATTEMPT #1:
-🎲 Filling main diagonal with Fisher-Yates...
-   Subgrid 0 (base: 0,0): 1 2 5 7 3 8 6 9 4 
-   Subgrid 4 (base: 3,3): 6 2 8 5 4 7 1 9 3 
-   Subgrid 8 (base: 6,6): 9 2 3 6 8 5 7 4 1 
-✅ Diagonal completed!
+🎲 Filling diagonal with Fisher-Yates...
+   SubGrid 0 (base: 0,0): 6 4 8 3 1 5 7 9 2 
+   SubGrid 4 (base: 3,3): 9 7 4 3 8 5 1 2 6 
+   SubGrid 8 (base: 6,6): 6 3 7 1 8 2 9 4 5 
+✅ Diagonal successfully filled!
 
-🔄 Completing with backtracking...
+🔄 Backtracking in progress...
+✅ Completed!
 🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...
-   Subgrid 0 (base: 0,0): 4 
-   Subgrid 1 (base: 0,3): 9 
-   Subgrid 2 (base: 0,6): 3 
-   Subgrid 3 (base: 3,0): 5 
-   Subgrid 4 (base: 3,3): 8 
-   Subgrid 5 (base: 3,6): 7 
-   Subgrid 6 (base: 6,0): 6 
+   Subgrid 0 (base: 0,0): 3 
+   Subgrid 1 (base: 0,3): 7 
+   Subgrid 2 (base: 0,6): 8 
+   Subgrid 3 (base: 3,0): 6 
+   Subgrid 4 (base: 3,3): 9 
+   Subgrid 5 (base: 3,6): 5 
+   Subgrid 6 (base: 6,0): 4 
    Subgrid 7 (base: 6,3): 1 
    Subgrid 8 (base: 6,6): 2 
 ✅ Phase 1 completed!
+📊 PHASE 1 TOTAL: Removed 9 cells
 
 --- ROUND 1 ---
 🎲 PHASE 2: Selecting numbers without alternatives...
-   Subgrid 0 (base: 0,0): 1 
-   Subgrid 1 (base: 0,3): 3 
-   Subgrid 2 (base: 0,6): 4 
-   Subgrid 3 (base: 3,0): 7 
-   Subgrid 4 (base: 3,3): 6 
-   Subgrid 5 (base: 3,6): 9 
-   Subgrid 6 (base: 6,0): 8 
-   Subgrid 7 (base: 6,3): 7 
+   Subgrid 0 (base: 0,0): 6 
+   Subgrid 1 (base: 0,3): 2 
+   Subgrid 2 (base: 0,6): 5 
+   Subgrid 3 (base: 3,0): 1 
+   Subgrid 4 (base: 3,3): 4 
+   Subgrid 5 (base: 3,6): 2 
+   Subgrid 6 (base: 6,0): 5 
+   Subgrid 7 (base: 6,3): 8 
    Subgrid 8 (base: 6,6): 6 
 ✅ Phase 2 completed! Removed: 9
 
 --- ROUND 2 ---
 🎲 PHASE 2: Selecting numbers without alternatives...
-   Subgrid 0 (base: 0,0): 2 
-   Subgrid 1 (base: 0,3): 8 
-   Subgrid 2 (base: 0,6): 2 
-   Subgrid 3 (base: 3,0): 3 
-   Subgrid 4 (base: 3,3): 2 
-   Subgrid 5 (base: 3,6): 4 
-   Subgrid 6 (base: 6,0): 3 
+   Subgrid 0 (base: 0,0): 8 
+   Subgrid 1 (base: 0,3): 1 
+   Subgrid 2 (base: 0,6): 9 
+   Subgrid 3 (base: 3,0): 8 
+   Subgrid 4 (base: 3,3): 3 
+   Subgrid 5 (base: 3,6): 7 
+   Subgrid 6 (base: 6,0): 9 
    Subgrid 7 (base: 6,3): 5 
-   Subgrid 8 (base: 6,6): 5 
+   Subgrid 8 (base: 6,6): 3 
 ✅ Phase 2 completed! Removed: 9
 
 --- ROUND 3 ---
 🎲 PHASE 2: Selecting numbers without alternatives...
-   Subgrid 0 (base: 0,0): 9 
-   Subgrid 1 (base: 0,3): 
-   Subgrid 2 (base: 0,6): 8 
+   Subgrid 0 (base: 0,0): 
+   Subgrid 1 (base: 0,3): 4 
+   Subgrid 2 (base: 0,6): 
    Subgrid 3 (base: 3,0): 
-   Subgrid 4 (base: 3,3): 3 
+   Subgrid 4 (base: 3,3): 6 
    Subgrid 5 (base: 3,6): 1 
-   Subgrid 6 (base: 6,0): 
-   Subgrid 7 (base: 6,3): 4 
-   Subgrid 8 (base: 6,6): 7 
-✅ Phase 2 completed! Removed: 6
+   Subgrid 6 (base: 6,0): 2 
+   Subgrid 7 (base: 6,3): 7 
+   Subgrid 8 (base: 6,6): 
+✅ Phase 2 completed! Removed: 5
 
 --- ROUND 4 ---
+🎲 PHASE 2: Selecting numbers without alternatives...
+   Subgrid 0 (base: 0,0): 
+   Subgrid 1 (base: 0,3): 
+   Subgrid 2 (base: 0,6): 
+   Subgrid 3 (base: 3,0): 
+   Subgrid 4 (base: 3,3): 
+   Subgrid 5 (base: 3,6): 
+   Subgrid 6 (base: 6,0): 7 
+   Subgrid 7 (base: 6,3): 
+   Subgrid 8 (base: 6,6): 
+✅ Phase 2 completed! Removed: 1
+
+--- ROUND 5 ---
 🎲 PHASE 2: Selecting numbers without alternatives...
    Subgrid 0 (base: 0,0): 
    Subgrid 1 (base: 0,3): 
@@ -120,47 +139,54 @@
 
 🛑 Cannot remove more numbers in PHASE 2
 
-🎲 PHASE 3: Free elimination with unique solution verification...
-   Removed 9 at (4,0) - Total: 1
-   Removed 7 at (2,4) - Total: 2
-   Removed 4 at (4,4) - Total: 3
-   Removed 1 at (3,1) - Total: 4
-   Removed 7 at (1,0) - Total: 5
-   Removed 9 at (5,4) - Total: 6
-   Removed 4 at (6,1) - Total: 7
-   Removed 9 at (7,5) - Total: 8
-   Removed 6 at (2,0) - Total: 9
-   Removed 7 at (4,5) - Total: 10
-   Removed 2 at (7,0) - Total: 11
-   Removed 6 at (0,5) - Total: 12
-   Removed 6 at (5,1) - Total: 13
-   Removed 6 at (8,4) - Total: 14
-   Removed 2 at (4,6) - Total: 15
-   Removed 7 at (0,7) - Total: 16
-   Removed 8 at (5,6) - Total: 17
-   Removed 5 at (0,2) - Total: 18
-   Removed 6 at (1,7) - Total: 19
-   Removed 8 at (1,2) - Total: 20
-✅ Phase 3 completed! Removed: 20
 
+📊 PHASE 2 TOTAL: 4 rounds, removed 24 cells
+
+🎲 PHASE 3: Free elimination with unique solution verification...
+   Removed 2 at memAddr: 0x5f90ecc31410 (5,4) - Total: 1
+   Removed 1 at memAddr: 0x5f90ecc31418 (2,7) - Total: 2
+   Removed 4 at memAddr: 0x5f90ecc31420 (2,8) - Total: 3
+   Removed 9 at memAddr: 0x5f90ecc31428 (5,7) - Total: 4
+   Removed 9 at memAddr: 0x5f90ecc31430 (6,4) - Total: 5
+   Removed 9 at memAddr: 0x5f90ecc31438 (8,6) - Total: 6
+   Removed 9 at memAddr: 0x5f90ecc31440 (1,5) - Total: 7
+   Removed 4 at memAddr: 0x5f90ecc31448 (4,6) - Total: 8
+   Removed 8 at memAddr: 0x5f90ecc31450 (7,7) - Total: 9
+   Removed 8 at memAddr: 0x5f90ecc31458 (2,5) - Total: 10
+   Removed 5 at memAddr: 0x5f90ecc31460 (2,3) - Total: 11
+   Removed 3 at memAddr: 0x5f90ecc31470 (3,2) - Total: 12
+   Removed 5 at memAddr: 0x5f90ecc31478 (5,0) - Total: 13
+   Removed 2 at memAddr: 0x5f90ecc31480 (1,6) - Total: 14
+   Removed 8 at memAddr: 0x5f90ecc314a8 (5,6) - Total: 15
+   Removed 3 at memAddr: 0x5f90ecc314b0 (2,6) - Total: 16
+   Removed 8 at memAddr: 0x5f90ecc314b8 (4,4) - Total: 17
+   Removed 4 at memAddr: 0x5f90ecc314c8 (5,2) - Total: 18
+   Removed 7 at memAddr: 0x5f90ecc314d0 (5,1) - Total: 19
+   Removed 3 at memAddr: 0x5f90ecc314e0 (7,1) - Total: 20
+   Removed 6 at memAddr: 0x5f90ecc314f0 (7,2) - Total: 21
+   Removed 1 at memAddr: 0x5f90ecc31510 (1,1) - Total: 22
+   Removed 6 at memAddr: 0x5f90ecc31548 (1,7) - Total: 23
+✅ Phase 3 completed! Removed: 23
 ✅ SUCCESS! Sudoku generated
 
 ┌───────┬───────┬───────┐
-│ * * * │ * * * │ * * 9 │
-│ * 3 * │ * 5 4 │ 1 * * │
-│ * * * │ 2 * 1 │ 5 * * │
+│ . 4 . │ . 3 . │ 7 . . │
+│ . . 5 │ . . . │ . . . │
+│ 7 9 2 │ . 6 . │ . . . │
 ├───────┼───────┼───────┤
-│ * * * │ * * * │ 3 * * │
-│ * 8 * │ 5 * * │ * * 6 │
-│ 4 * 2 │ 1 * * │ * 5 * │
+│ . . . │ . 7 . │ . . 6 │
+│ 2 . 9 │ . . 5 │ . . . │
+│ . . . │ 1 . . │ . . 3 │
 ├───────┼───────┼───────┤
-│ * * * │ * * * │ 9 * 3 │
-│ * 7 1 │ * 3 * │ * 8 * │
-│ * 5 9 │ 8 * 2 │ * 4 1 │
+│ . . 1 │ . . 2 │ . . 7 │
+│ . . . │ 4 . . │ 1 . . │
+│ 8 . . │ 6 . 3 │ . 4 5 │
 └───────┴───────┴───────┘
-📊 Empty cells: 53 | Filled cells: 28
+📊 Empty: 56 | Clues: 25
 
 🎉 VERIFIED! The puzzle is valid
+
+📊 Difficulty level: HARD
 ```
 
 ## 📦 Instalación
@@ -180,33 +206,32 @@ cd sudoku_en_c
 ### Compilar
 
 #### 🐧 **Linux / macOS**
-
 ```bash
 # Compilación simple
 gcc main.c -o sudoku
 
-# Con optimizaciones
-gcc -O2 main.c -o sudoku
+# Con optimizaciones (recomendado)
+gcc -O2 main.c -o sudoku -std=c11
 
 # Con warnings detallados
-gcc -Wall -Wextra main.c -o sudoku
+gcc -Wall -Wextra main.c -o sudoku -std=c11
 ```
+
+**Nota**: Se recomienda usar `-std=c11` para aprovechar características modernas del lenguaje.
 
 #### 🪟 **Windows (VS Code / MinGW / MSYS2)**
-
 ```bash
-# Compilación con soporte UTF-8
-gcc -g main.c -o sudoku.exe -fexec-charset=UTF-8
+# Compilación con soporte UTF-8 y C11
+gcc -g main.c -o sudoku.exe -fexec-charset=UTF-8 -std=c11
 
 # O simplemente (el programa se auto-configura)
-gcc main.c -o sudoku.exe
+gcc main.c -o sudoku.exe -std=c11
 ```
-
 **Nota:** El programa detecta automáticamente Windows y configura UTF-8 en tiempo de ejecución. No necesitas configuraciones adicionales.
 
 ## 🎛️ Modos de Verbosidad
 
-### Versión 2.2.0: Control de Salida Configurable
+### Versión 2.2.1: Control de Salida Configurable
 
 El generador soporta tres niveles de verbosidad controlables por línea de comandos:
 
@@ -227,22 +252,23 @@ El generador soporta tres niveles de verbosidad controlables por línea de coman
 **Ejemplo de salida:**
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+  SUDOKU GENERATOR v2.2.1 – STRUCTURE-BASED REFACTORING
 ═══════════════════════════════════════════════════════════════
 
 ┌───────┬───────┬───────┐
-│ * * 8 │ * 9 * │ * * * │
-│ * 5 * │ * * * │ * 6 * │
-│ * * * │ * 4 * │ * 2 7 │
+│ . . . │ . 2 1 │ . . . │
+│ 5 . . │ 4 . . │ 7 . . │
+│ . 7 . │ . 8 . │ . . . │
 ├───────┼───────┼───────┤
-│ 3 * 6 │ * * * │ * * 8 │
-│ * * 7 │ * 6 * │ 9 4 * │
-│ 2 * * │ * * * │ * 1 3 │
+│ . 3 . │ . . . │ . . 6 │
+│ . . . │ 5 . 9 │ 2 . 3 │
+│ . . 4 │ . . 7 │ . . . │
 ├───────┼───────┼───────┤
-│ * * 4 │ * * * │ * * * │
-│ * * * │ 2 * 1 │ * * * │
-│ 6 * 3 │ * 8 9 │ * * * │
+│ . . . │ . . . │ . . 8 │
+│ 6 5 9 │ . . 2 │ . . . │
+│ . . . │ . . 4 │ 9 1 . │
 └───────┴───────┴───────┘
+
 
 📊 Difficulty level: EXPERT
 ```
@@ -270,36 +296,39 @@ El generador soporta tres niveles de verbosidad controlables por línea de coman
 **Ejemplo de salida:**
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+  SUDOKU GENERATOR v2.2.1 – STRUCTURE-BASED REFACTORING
 ═══════════════════════════════════════════════════════════════
 
 🚀 ATTEMPT #1:
 🎲 Diagonal + Backtracking...✅ Completed!
 🎲 Phase 1: Fisher-Yates selection...✅ Phase 1 completed!
 📊 PHASE 1 TOTAL: Removed 9 cells
+
 🎲 Phase 2: Removal rounds...
-📊 PHASE 2 TOTAL: Removed 23 cells across 4 rounds
-🎲 Phase 3: Free elimination...✅ Phase 3 completed! Removed: 24
+📊 PHASE 2 TOTAL: 4 rounds, removed 23 cells
+
+🎲 Phase 3: Free elimination...✅ Phase 3 completed! Removed: 25
 ✅ SUCCESS! Sudoku generated
 
 ┌───────┬───────┬───────┐
-│ * * * │ * * * │ 6 * * │
-│ * * 8 │ 4 * * │ * * * │
-│ * * 5 │ * * 3 │ 8 * 2 │
+│ . . . │ . . . │ . . . │
+│ . . . │ 5 . 1 │ 9 . . │
+│ 7 . 9 │ . 3 . │ . 2 . │
 ├───────┼───────┼───────┤
-│ * * 2 │ * * * │ * 6 * │
-│ 4 3 * │ * 7 * │ * * * │
-│ * 6 * │ 2 1 * │ * 8 * │
+│ . 4 . │ . . . │ . . 5 │
+│ . 8 . │ 6 . 3 │ . . . │
+│ . . 2 │ . . . │ . . . │
 ├───────┼───────┼───────┤
-│ * * * │ * * 7 │ 5 * * │
-│ * 2 * │ 8 * * │ * 1 * │
-│ 1 * 7 │ * * 9 │ * 3 * │
+│ 1 . . │ . . 5 │ . 3 . │
+│ . 6 . │ . . . │ . . . │
+│ 4 5 . │ 1 2 7 │ 6 9 . │
 └───────┴───────┴───────┘
-📊 Empty cells: 56 | Filled cells: 25
+📊 Empty: 57 | Clues: 24
 
 🎉 VERIFIED! The puzzle is valid
 
-📊 Difficulty level: HARD
+📊 Difficulty level: EXPERT
+
 ```
 
 ---
@@ -323,7 +352,7 @@ El generador soporta tres niveles de verbosidad controlables por línea de coman
 **Ejemplo de salida (parcial):**
 ```
 ═══════════════════════════════════════════════════════════════
-        SUDOKU GENERATOR v2.2.0 - HYBRID METHOD
+        SUDOKU GENERATOR v2.2.1 - HYBRID METHOD
            Fisher-Yates + Backtracking + 3 Phases
 ═══════════════════════════════════════════════════════════════
 
@@ -397,7 +426,7 @@ int VERBOSITY_LEVEL = 1;  // Cambiar a 0, 1, o 2
 
 Luego recompila:
 ```bash
-gcc -O2 main.c -o sudoku -std=c99
+gcc -O2 main.c -o sudoku -std=c11
 ```
 
 ## 🚀 Uso
@@ -423,26 +452,37 @@ El programa generará automáticamente un puzzle de Sudoku jugable y mostrará:
 - Estadísticas de celdas vacías/llenas
 
 ### Integración en Otro Proyecto
-
 ```c
 #include "main.c"
 
 int main() {
-    int sudoku[SIZE][SIZE];
+    // Asignar memoria para el tablero
+    SudokuBoard *board = (SudokuBoard *)malloc(sizeof(SudokuBoard));
+    if(board == NULL) {
+        fprintf(stderr, "Error: No se pudo asignar memoria\n");
+        return 1;
+    }
+    
+    GenerationStats stats;
     
     // Generar puzzle jugable
-    if(generateHybridSudoku(sudoku)) {
-        printSudoku(sudoku);
+    if(generateSudoku(board, &stats)) {
+        printBoard(board);
         
         // Verificar validez
-        if(validateSudoku(sudoku)) {
-            printf("Puzzle válido!\n");
+        if(validateBoard(board)) {
+            printf("✅ Puzzle válido!\n");
+            printf("📊 Dificultad: %s\n", evaluateDifficulty(board));
         }
     }
     
+    // Liberar memoria
+    free(board);
     return 0;
 }
 ```
+
+**Nota**: Este ejemplo demuestra el uso de las nuevas estructuras de datos y gestión de memoria dinámica introducidas en v2.2.1.
 
 ### Configurar Dificultad
 
@@ -525,6 +565,69 @@ El proyecto incluye un archivo `.gitattributes` para mantener consistencia de sa
 
 Esto asegura que el código funcione correctamente al clonarse en cualquier sistema operativo.
 
+## 🏗️ Arquitectura del Código (v2.2.1)
+
+### Refactorización Basada en Estructuras
+
+La versión 2.2.1 introduce una refactorización completa del código usando principios modernos de ingeniería de software:
+
+#### Estructuras de Datos
+
+**Position**: Abstrae coordenadas (fila, columna)
+```c
+typedef struct {
+    int row;
+    int col;
+} Position;
+```
+
+**SudokuBoard**: Encapsula el tablero y sus metadatos
+```c
+typedef struct {
+    int cells[SIZE][SIZE];
+    int clues;
+    int empty;
+} SudokuBoard;
+```
+
+**SubGrid**: Representa regiones 3x3 del tablero
+```c
+typedef struct {
+    int index;
+    Position base;
+} SubGrid;
+```
+
+**GenerationStats**: Agrupa estadísticas de generación
+```c
+typedef struct {
+    int phase1_removed;
+    int phase2_removed;
+    int phase2_rounds;
+    int phase3_removed;
+} GenerationStats;
+```
+
+#### Ventajas de la Refactorización
+
+**Modularidad mejorada**: Cada función tiene una responsabilidad clara y única.
+
+**Eficiencia de memoria**: El uso de punteros reduce copias innecesarias. En lugar de pasar 324 bytes por valor, pasamos solo 8 bytes (dirección de memoria).
+
+**Extensibilidad**: Agregar nuevas características al tablero (como timestamps o configuraciones) solo requiere modificar las estructuras, no las firmas de funciones.
+
+**Mantenibilidad**: La separación clara de responsabilidades hace el código más fácil de entender, probar y modificar.
+
+**Type safety**: El uso de `const` previene modificaciones accidentales y permite optimizaciones del compilador.
+
+#### Mejoras Técnicas
+
+- **Forward declarations**: Organización profesional del código con declaraciones adelantadas
+- **Typedef**: Simplifica declaraciones y mejora legibilidad
+- **Const correctness**: Parámetros de solo lectura marcados explícitamente
+- **Memoria dinámica**: Uso educativo de malloc/free en fase 3
+- **Documentación Doxygen**: Comentarios profesionales en todas las Funciones
+
 ## 🧠 Cómo Funciona
 
 ### Enfoque Híbrido + Sistema de 3 Fases
@@ -592,18 +695,21 @@ Se completan las celdas restantes usando backtracking recursivo con poda:
 **Complejidad:** O(n)
 
 ```c
-void fisherYatesShuffle(int *array, int size, int num_in) {
-    // Llenar array consecutivo
+void fisherYatesShuffle(int *array, int size, int start_value) {
+    // Fill consecutively
     for(int i = 0; i < size; i++) {
-        array[i] = num_in + i;
+        array[i] = start_value + i;
     }
     
-    // Mezclar (Fisher-Yates)
-    for(int i = size-1; i > 0; i--) {
+    // Shuffle (Fisher-Yates backward)
+    for(int i = size - 1; i > 0; i--) {
         int j = rand() % (i + 1);
-        int temp = array[i];
-        array[i] = array[j];
-        array[j] = temp;
+        // Swap using XOR arithmetic (educational alternative)
+        if(i != j) {
+            array[i] ^= array[j];
+            array[j] ^= array[i];
+            array[i] ^= array[j];
+        }
     }
 }
 ```
@@ -618,26 +724,28 @@ void fisherYatesShuffle(int *array, int size, int num_in) {
 **Complejidad:** O(9^m) donde m = celdas vacías
 
 ```c
-bool completeSudoku(int sudoku[SIZE][SIZE]) {
-    int row, col;
+bool completeSudoku(SudokuBoard *board) {
+    Position pos;
     
-    // 1. Buscar celda vacía
-    if(!findEmptyCell(sudoku, &row, &col)) {
-        return true; // ¡Completo!
+    if(!findEmptyCell(board, &pos)) {
+        return true; // Complete board
     }
     
-    // 2. Probar números 1-9
-    for(int num = 1; num <= 9; num++) {
-        if(isSafePosition(sudoku, row, col, num)) {
-            sudoku[row][col] = num;
+    // Array of numbers to try (1-9) shuffled
+    int numbers[SIZE];
+    fisherYatesShuffle(numbers, SIZE, 1);
+    
+    for(int i = 0; i < SIZE; i++) {
+        int num = numbers[i];
+        
+        if(isSafePosition(board, &pos, num)) {
+            board->cells[pos.row][pos.col] = num;
             
-            // 3. Recursión
-            if(completeSudoku(sudoku)) {
+            if(completeSudoku(board)) {
                 return true;
             }
             
-            // 4. Backtrack
-            sudoku[row][col] = 0;
+            board->cells[pos.row][pos.col] = 0; // Backtrack
         }
     }
     
@@ -655,7 +763,7 @@ bool completeSudoku(int sudoku[SIZE][SIZE]) {
 **Complejidad:** O(9^m) peor caso, O(9^k) típico con early exit
 
 ```c
-int countSolutionsExact(int sudoku[SIZE][SIZE], int limite) {
+int countSolutionsExact(SudokuBoard *board, int limit) {
     // Cuenta soluciones hasta límite
     // Si encuentra >= 2, para inmediatamente (early exit)
     // Speedup típico: 10^40 - 10^44 veces
@@ -688,19 +796,25 @@ sudoku_en_c/
 | `isSafePosition()` | Valida si un número es válido | O(1) |
 | `findEmptyCell()` | Busca siguiente celda vacía | O(n²) |
 | `fillDiagonal()` | Llena subcuadrículas independientes | O(1) |
+| `fillSubGrid()` | Llena una subcuadrícula específica | O(1) |
 | `completeSudoku()` | Completa con backtracking | O(9^m) |
-| `firstRandomElimination()` | FASE 1: Eliminación aleatoria | O(1) |
-| `hasAlternativeInRowCol()` | Verifica alternativas | O(1) |
-| `secondNoAlternativeElimination()` | FASE 2: Sin alternativas | O(n²) |
-| `countSolutionsExact()` | Cuenta soluciones (con early exit) | O(9^m) |
-| `thirdFreeElimination()` | FASE 3: Libre verificada | O(n² × 9^m) |
-| `generateHybridSudoku()` | Orquesta todo el proceso | - |
-| `printSudoku()` | Imprime visualmente | O(n²) |
-| `validateSudoku()` | Valida el tablero completo | O(n²) |
+| `hasAlternative()` | Verifica si hay alternativas | O(1) |
+| `phase1Elimination()` | FASE 1: Eliminación aleatoria | O(1) |
+| `phase2Elimination()` | FASE 2: Eliminación sin alternativas | O(n²) |
+| `phase3Elimination()` | FASE 3: Eliminación libre verificada | O(n² × 9^m) |
+| `countSolutionsExact()` | Cuenta soluciones con early exit | O(9^m) |
+| `generateSudoku()` | Orquesta todo el proceso | - |
+| `printBoard()` | Imprime el tablero visualmente | O(n²) |
+| `validateBoard()` | Valida el tablero completo | O(n²) |
+| `evaluateDifficulty()` | Evalúa dificultad por pistas | O(1) |
+| `initBoard()` | Inicializa tablero vacío | O(n²) |
+| `updateBoardStats()` | Actualiza estadísticas | O(n²) |
+| `createSubGrid()` | Crea estructura SubGrid | O(1) |
+| `getPositionInSubGrid()` | Calcula posición en subgrid | O(1) |
 
 ## 🗺️ Roadmap
 
-### ✅ Versión 2.2.0 (Actual)
+### ✅ Versión 2.2.1 (Actual - Enero 2025)
 - [x] Generación completa de sudokus
 - [x] Sistema de 3 fases de eliminación
 - [x] Verificación de solución única
@@ -712,21 +826,25 @@ sudoku_en_c/
 - [x] Auto-configuración UTF-8
 - [x] Modos de verbosidad configurables (0/1/2)
 - [x] Parseo de argumentos de línea de comandos
+- [x] **Refactorización con estructuras de datos**
+- [x] **Forward declarations profesionales**
+- [x] **Gestión de memoria con malloc/free**
+- [x] **Arquitectura modular y extensible**
 
-### 🚧 Versión 2.5 (Futuro Cercano)
-- [ ] Selección dinámica de dificultad
-- [ ] Múltiples niveles de dificultad
+### 🚧 Versión 2.3 (Próximo - Q1 2025)
+- [ ] Tests unitarios con framework de testing
+- [ ] Configuración flexible (Config struct)
+- [ ] Export/import de puzzles (save/load)
+- [ ] Estadísticas detalladas de generación
+
+### 🔮 Versión 3.0 (Futuro - Q2 2025)
+- [ ] Soporte multi-tamaño (4x4, 16x16, 25x25)
+- [ ] CLI mejorado con sistema de dos dígitos (`./sudoku 00`)
+- [ ] Memoria dinámica para tableros variables
+- [ ] Selector de dificultad integrado
 - [ ] Solver automático
-- [ ] Exportar/importar sudokus
-- [ ] Estadísticas de generación
-- [ ] Tests unitarios
-
-### 🔮 Versión 3.0 (Ideas)
 - [ ] GUI con ncurses
 - [ ] Modo interactivo para jugar
-- [ ] Generador de variantes (6x6, 12x12, etc.)
-- [ ] API REST
-- [ ] Biblioteca compartida (.so/.dll)
 
 ## 🤝 Contribuir
 

@@ -32,10 +32,15 @@ Algorithm implementations:
   Uses early-exit optimization for efficient solution counting
 
 Acknowledgments:
+This project was inspired by and draws upon knowledge from:
 - Fisher-Yates shuffle algorithm: Ronald Fisher and Frank Yates (1938)
 - Backtracking concept: General algorithmic technique in computer science
 - Sudoku puzzle rules: Traditional Japanese number puzzle game
-
+- GeeksforGeeks (https://www.geeksforgeeks.org/)
+- Wikipedia articles on Sudoku and related algorithms
+- The competitive programming community
+No code was directly copied from these sources. All implementations are 
+original work by the copyright holder.
 ================================================================================
 
 ATTRIBUTION REQUIREMENTS:
