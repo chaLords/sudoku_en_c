@@ -3,6 +3,9 @@
 *.out
 *.app
 sudoku
+sudoku-generator
+sudoku-solver
+sudoku-play
 a.out
 
 # Archivos objeto
@@ -49,17 +52,15 @@ dkms.conf
 .DS_Store
 Thumbs.db
 
-# Documentación en español (solo local, no subir a GitHub)
-docs/TECHNICAL.es.md
-docs/ALGORITHMS.es.md
-CHANGELOG.es.md
 # Directorios de build
 build/
 bin/
+lib/
 obj/
 debug/
 release/
 archive/
+
 # IDEs y editores
 .vscode/
 .idea/
@@ -68,10 +69,15 @@ archive/
 .atom/
 *.code-workspace
 
+# Documentación generada
+docs/html/
+docs/latex/
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+install_manifest.txt
 Makefile
 *.cmake
 
@@ -88,3 +94,5 @@ vgcore.*
 core
 core.*
 
+# Backup
+*.backup
