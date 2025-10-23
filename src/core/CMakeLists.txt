@@ -6,7 +6,7 @@ set(CORE_SOURCES
 
 # Archivos de algoritmos
 set(ALGORITHM_SOURCES
-  #algorithms/fisher_yates.c
+  algorithms/fisher_yates.c
   #algorithms/backtracking.c
 )
 
