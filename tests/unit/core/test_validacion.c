@@ -73,19 +73,19 @@ int main(void) {
     
     // Test 1a: Try to place a 5 in the same row as another 5
     SudokuPosition test_pos_1 = {0, 1};  // Row 0, Column 1
-    bool safe_1 = sudoku_is_safe(&board, &test_pos_1, 5);
+    bool safe_1 = sudoku_is_safe_position(&board, &test_pos_1, 5);
     printf("Can we place 5 at position (0,1)? %s\n", safe_1 ? "YES" : "NO");
     printf("Expected: NO (because there's already a 5 in row 0)\n\n");
     
     // Test 1b: Try to place a 5 in a safe position
     SudokuPosition test_pos_2 = {5, 5};  // Row 5, Column 5
-    bool safe_2 = sudoku_is_safe(&board, &test_pos_2, 5);
+    bool safe_2 = sudoku_is_safe_position(&board, &test_pos_2, 5);
     printf("Can we place 5 at position (5,5)? %s\n", safe_2 ? "YES" : "NO");
     printf("Expected: YES (no conflict in row, column, or subgrid)\n\n");
     
     // Test 1c: Try to place a number in the same column as an existing number
     SudokuPosition test_pos_3 = {1, 0};  // Row 1, Column 0
-    bool safe_3 = sudoku_is_safe(&board, &test_pos_3, 7);
+    bool safe_3 = sudoku_is_safe_position(&board, &test_pos_3, 7);
     printf("Can we place 7 at position (1,0)? %s\n", safe_3 ? "YES" : "NO");
     printf("Expected: NO (because there's already a 7 in column 0)\n\n");
     
@@ -95,7 +95,7 @@ int main(void) {
     
     // The board currently has only 3 filled cells, so there are many empty ones
     SudokuPosition empty_pos;
-    bool found = sudoku_find_empty(&board, &empty_pos);
+    bool found = sudoku_find_empty_cell(&board, &empty_pos);
     
     printf("Looking for first empty cell...\n");
     if (found) {
@@ -115,7 +115,7 @@ int main(void) {
         }
     }
     
-    found = sudoku_find_empty(&board, &empty_pos);
+    found = sudoku_find_empty_cell(&board, &empty_pos);
     printf("Looking for empty cell in full board...\n");
     printf("Result: %s\n", found ? "Found (unexpected)" : "Not found (correct!)");
     printf("Expected: Not found - the board is now completely filled\n\n");
@@ -143,7 +143,7 @@ int main(void) {
     printf("Testing a valid partial board:\n");
     print_test_board(&valid_board);
     
-    bool is_valid = sudoku_verify(&valid_board);
+    bool is_valid = sudoku_validate_board(&valid_board);
     printf("Is the board valid? %s\n", is_valid ? "YES ✓" : "NO ✗");
     printf("Expected: YES - no conflicts in this configuration\n\n");
     
@@ -154,7 +154,7 @@ int main(void) {
     printf("Testing an invalid board (two 1's in row 0):\n");
     print_test_board(&invalid_board);
     
-    is_valid = sudoku_verify(&invalid_board);
+    is_valid = sudoku_validate_board(&invalid_board);
     printf("Is the board valid? %s\n", is_valid ? "YES ✓" : "NO ✗");
     printf("Expected: NO - there's a conflict in row 0\n\n");
     

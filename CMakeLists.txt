@@ -1,61 +1,45 @@
-cmake_minimum_required(VERSION 3.15)
-project(SudokuProject 
+cmake_minimum_required(VERSION 3.10)
+project(sudoku_generator 
     VERSION 1.0.0
+    DESCRIPTION "Sudoku Generator with Hybrid Algorithm"
     LANGUAGES C
-    DESCRIPTION "Modular Sudoku Generator and Solver"
 )
 
-# ═══════════════════════════════════════════════════════════
-# PROJECT CONFIGURATION
-# ═══════════════════════════════════════════════════════════
-
-set(CMAKE_C_STANDARD 99)
+# Configuración global del proyecto
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # For LSP (clangd)
+set(CMAKE_C_EXTENSIONS OFF)
 
-# ═══════════════════════════════════════════════════════════
-# INCLUDE DIRECTORIES
-# ═══════════════════════════════════════════════════════════
+# Opciones de compilación
+option(BUILD_TESTING "Build the testing tree" ON)
+option(BUILD_TOOLS "Build command-line tools" ON)
 
+# Configuración de paths
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# Incluir directorio público de headers
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
-# ═══════════════════════════════════════════════════════════
-# COMPILER FLAGS
-# ═══════════════════════════════════════════════════════════
+# Subdirectorios
+add_subdirectory(src)
 
-add_compile_options(
-    -Wall
-    -Wextra
-    -Wpedantic
-)
+if(BUILD_TOOLS)
+    add_subdirectory(tools)
+endif()
 
-# ═══════════════════════════════════════════════════════════
-# SOURCE FILES (Only those that currently exist)
-# ═══════════════════════════════════════════════════════════
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-set(SOURCES
-    src/core/validation.c
-    main_test.c
-)
-
-# ═══════════════════════════════════════════════════════════
-# MAIN EXECUTABLE
-# ═══════════════════════════════════════════════════════════
-
-add_executable(sudoku ${SOURCES})
-
-# ═══════════════════════════════════════════════════════════
-# BUILD INFORMATION
-# ═══════════════════════════════════════════════════════════
-
-message(STATUS "═══════════════════════════════════════════════════")
-message(STATUS "  Sudoku Project Configuration")
-message(STATUS "═══════════════════════════════════════════════════")
+# Información del proyecto
+message(STATUS "===================================")
+message(STATUS "  Sudoku Generator v${PROJECT_VERSION}")
+message(STATUS "===================================")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "C Standard: ${CMAKE_C_STANDARD}")
-message(STATUS "Compiler: ${CMAKE_C_COMPILER}")
-message(STATUS "Source files:")
-foreach(src ${SOURCES})
-    message(STATUS "  - ${src}")
-endforeach()
-message(STATUS "═══════════════════════════════════════════════════")
+message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
+message(STATUS "Build testing: ${BUILD_TESTING}")
+message(STATUS "Build tools: ${BUILD_TOOLS}")
+message(STATUS "===================================")

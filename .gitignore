@@ -90,9 +90,6 @@ compile_commands.json
 vgcore.*
 *.log
 
-# Core dumps
-core
-core.*
 
 # Backup
 *.backup
