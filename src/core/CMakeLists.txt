@@ -7,7 +7,7 @@ set(CORE_SOURCES
 # Archivos de algoritmos
 set(ALGORITHM_SOURCES
   algorithms/fisher_yates.c
-  #algorithms/backtracking.c
+  algorithms/backtracking.c
 )
 
 # Crear biblioteca estática del core
@@ -23,7 +23,7 @@ target_include_directories(sudoku_core PUBLIC
 
 # Incluir headers internos (privados)
 target_include_directories(sudoku_core PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/internal
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Propiedades de la biblioteca

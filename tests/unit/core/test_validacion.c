@@ -17,6 +17,7 @@
 // Include the modular headers - this is the key difference from the monolithic code
 #include <sudoku/core/types.h>
 #include <sudoku/core/validation.h>
+#include <internal/board_internal.h>
 
 /**
  * Helper function to print a small board for visualization

@@ -11,6 +11,7 @@ target_link_libraries(test_board PRIVATE
 
 target_include_directories(test_board PRIVATE
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/core
 )
 
 add_test(NAME BoardTests COMMAND test_board)
@@ -26,6 +27,7 @@ target_link_libraries(test_validation PRIVATE
 
 target_include_directories(test_validation PRIVATE
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/core
 )
 
 add_test(NAME ValidationTests COMMAND test_validation)

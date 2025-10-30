@@ -4,7 +4,8 @@ project(sudoku_generator
     DESCRIPTION "Sudoku Generator with Hybrid Algorithm"
     LANGUAGES C
 )
-
+# Exportar comandos de compilación para herramientas de análisis estático
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Configuración global del proyecto
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
