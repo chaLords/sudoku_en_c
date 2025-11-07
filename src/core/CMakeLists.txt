@@ -2,6 +2,9 @@
 set(CORE_SOURCES
     board.c
     validation.c
+    display.c
+    generator.c
+    config.c
 )
 
 # Archivos de algoritmos
@@ -10,10 +13,16 @@ set(ALGORITHM_SOURCES
   algorithms/backtracking.c
 )
 
+# Archivos del sistema de eliminación
+set(ELIMINATION_SOURCES
+    elimination/elimination.c     # ← AQUÍ está tu archivo nuevo
+)
+
 # Crear biblioteca estática del core
 add_library(sudoku_core STATIC
     ${CORE_SOURCES}
     ${ALGORITHM_SOURCES}
+    ${ELIMINATION_SOURCES}
 )
 
 # Incluir headers públicos
@@ -23,7 +32,7 @@ target_include_directories(sudoku_core PUBLIC
 
 # Incluir headers internos (privados)
 target_include_directories(sudoku_core PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/internal
 )
 
 # Propiedades de la biblioteca

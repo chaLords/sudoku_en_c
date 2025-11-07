@@ -3,7 +3,7 @@
  * @file generator_internal.h
  * @brief Internal generator functions not exposed in the public API
  * @author Gonzalo Ramírez
- * @date 2025-01-19
+ * @date 2025-10-19
  * 
  * This header contains private functions used by the Sudoku generator
  * during the board generation process. These functions are implementation

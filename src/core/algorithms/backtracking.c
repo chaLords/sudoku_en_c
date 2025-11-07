@@ -9,8 +9,8 @@
  * with intelligent pruning to efficiently find a valid complete board.
  */
 
-#include "internal/generator_internal.h"
-#include "internal/board_internal.h"
+#include "../internal/generator_internal.h"
+#include "../internal/board_internal.h"
 #include "sudoku/core/validation.h"
 #include <stdlib.h>
 #include <assert.h>

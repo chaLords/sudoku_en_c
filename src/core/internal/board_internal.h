@@ -12,6 +12,7 @@
 #ifndef SUDOKU_BOARD_INTERNAL_H
 #define SUDOKU_BOARD_INTERNAL_H
 
+#include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 #include <stdbool.h>
 
@@ -42,5 +43,14 @@
  * @note Space complexity: O(1) - no additional memory allocation
  */
 bool sudoku_find_empty_cell(const SudokuBoard *board, SudokuPosition *pos);
+// Funciones de llenado de tablero (internas)
+void fillSubGrid(SudokuBoard *board, const SudokuSubGrid *sg);
+void fillDiagonal(SudokuBoard *board);
+
+// Actualización de contadores (wrapper)
+void sudoku_board_update_stats(SudokuBoard *board);
+
+// Nota: sudoku_subgrid_create() y sudoku_subgrid_get_position()
+// ya están declaradas en board.h público, no duplicamos aquí
 
 #endif // SUDOKU_BOARD_INTERNAL_H
