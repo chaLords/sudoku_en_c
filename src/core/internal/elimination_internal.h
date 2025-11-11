@@ -2,7 +2,6 @@
 #ifndef SUDOKU_ELIMINATION_INTERNAL_H
 #define SUDOKU_ELIMINATION_INTERNAL_H
 
-#include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 
 // Declaraciones de las tres fases

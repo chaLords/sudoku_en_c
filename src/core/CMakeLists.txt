@@ -15,7 +15,9 @@ set(ALGORITHM_SOURCES
 
 # Archivos del sistema de eliminación
 set(ELIMINATION_SOURCES
-    elimination/elimination.c     # ← AQUÍ está tu archivo nuevo
+    elimination/phase1.c
+    elimination/phase2.c
+    elimination/phase3.c 
 )
 
 # Crear biblioteca estática del core

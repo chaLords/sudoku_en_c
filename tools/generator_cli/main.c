@@ -75,11 +75,11 @@ int main(int argc, char *argv[]) {
     // Display title based on verbosity level
     if(current_level == 0 || current_level == 1) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("  SUDOKU GENERATOR v2.3.0 – MODULAR ARCHITECTURE\n");
+        printf("  SUDOKU GENERATOR v2.2.2 – MODULAR ARCHITECTURE\n");
         printf("═══════════════════════════════════════════════════════════════\n\n");
     } else if(current_level == 2) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("    SUDOKU GENERATOR v2.3.0 – MODULAR ARCHITECTURE\n");
+        printf("    SUDOKU GENERATOR v2.2.2 – MODULAR ARCHITECTURE\n");
         printf("           Fisher-Yates + Backtracking + 3 Phases\n");
         printf("═══════════════════════════════════════════════════════════════\n\n");
     }

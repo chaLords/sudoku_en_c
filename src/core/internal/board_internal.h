@@ -12,7 +12,6 @@
 #ifndef SUDOKU_BOARD_INTERNAL_H
 #define SUDOKU_BOARD_INTERNAL_H
 
-#include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 #include <stdbool.h>
 
