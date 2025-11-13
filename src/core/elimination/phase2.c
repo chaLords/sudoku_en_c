@@ -43,7 +43,8 @@
  */
 
 #include "config_internal.h"                // For VERBOSITY_LEVEL global
-#include "elimination_internal.h"  // For our own function declarations
+#include "elimination_internal.h"           // For our own function declarations
+#include "board_internal.h"                 // For internal function declarations
 #include "sudoku/core/validation.h"         // For sudoku_is_safe_position(), countSolutionsExact()
 #include "sudoku/core/board.h"              // For subgrid utilities
 #include <stdio.h>                          // For printf(), fprintf()

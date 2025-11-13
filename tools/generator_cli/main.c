@@ -16,6 +16,7 @@
 #include <time.h>
 
 // Include ONLY public headers from the library
+#include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 #include "sudoku/core/generator.h"
 #include "sudoku/core/display.h"
@@ -63,12 +64,11 @@ int main(int argc, char *argv[]) {
     int current_level = sudoku_get_verbosity();
     
     // Allocate memory for the board (demonstrates dynamic allocation)
-    SudokuBoard *board = (SudokuBoard *)malloc(sizeof(SudokuBoard));
-    if(board == NULL) {
-        fprintf(stderr, "❌ Error: Could not allocate memory for the board\n");
-        return 1;
-    }
-    
+   SudokuBoard *board = sudoku_board_create();
+if (board == NULL) {
+    fprintf(stderr, "Error: No se pudo crear el tablero\n");
+    return 1;
+}    
     // Structure to store generation statistics
     SudokuGenerationStats stats;
     
@@ -127,8 +127,7 @@ int main(int argc, char *argv[]) {
     }
     
     // Free allocated memory
-    free(board);
-    
+    sudoku_board_destroy(board);    
     // Report final status
     if(!success) {
         fprintf(stderr, "\n❌ ERROR: Could not generate a valid Sudoku after multiple attempts!\n");

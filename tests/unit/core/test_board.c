@@ -14,10 +14,10 @@ void print_test_board(const SudokuBoard *board) {
     printf("\nCurrent board state:\n");
     for(int i = 0; i < SUDOKU_SIZE; i++) {
         for(int j = 0; j < SUDOKU_SIZE; j++) {
-            if(board->cells[i][j] == 0) {
+            if(sudoku_board_get_cell(board, i, j) == 0) {
                 printf(". ");
             } else {
-                printf("%d ", board->cells[i][j]);
+                printf("%d ", sudoku_board_get_cell(board, i, j));
             }
             if((j + 1) % 3 == 0 && j < 8) printf("| ");
         }
@@ -66,14 +66,16 @@ void test_board_init(void) {
     printf("TEST 1: sudoku_board_init() - Board Initialization\n");
     printf("===============================================================\n");
     
-    SudokuBoard board;
-    sudoku_board_init(&board);
-    
+    SudokuBoard *board = sudoku_board_create();
+if (board == NULL) {
+    printf("  [FAIL] Could not create board\n");
+    return;
+}    
     /* Verificar que todas las celdas estan en 0 */
     bool all_zeros = true;
     for(int i = 0; i < SUDOKU_SIZE; i++) {
         for(int j = 0; j < SUDOKU_SIZE; j++) {
-            if(board.cells[i][j] != 0) {
+            if(sudoku_board_get_cell(board, i, j) != 0) {
                 all_zeros = false;
                 break;
             }
@@ -81,10 +83,11 @@ void test_board_init(void) {
     }
     
     TEST_ASSERT(all_zeros, "All cells initialized to 0");
-    TEST_ASSERT(board.clues == 0, "Clues counter is 0");
-    TEST_ASSERT(board.empty == TOTAL_CELLS, "Empty counter is 81");
+    TEST_ASSERT(sudoku_board_get_clues(board) == 0, "Clues counter is 0");
+    TEST_ASSERT(sudoku_board_get_empty(board) == TOTAL_CELLS, "Empty counter is 81");
     
-    print_test_board(&board);
+    print_test_board(board);
+    sudoku_board_destroy(board);
 }
 
 /**
@@ -95,24 +98,26 @@ void test_board_update_stats(void) {
     printf("TEST 2: sudoku_board_update_stats() - Stats Update\n");
     printf("===============================================================\n");
     
-    SudokuBoard board;
-    sudoku_board_init(&board);
-    
+  SudokuBoard *board = sudoku_board_create();
+if (board == NULL) {
+    printf("  [FAIL] Could not create board\n");
+    return;
+}    
     /* Colocar algunos numeros */
-    board.cells[0][0] = 5;
-    board.cells[0][1] = 3;
-    board.cells[0][2] = 7;
-    board.cells[4][4] = 9;
-    
+    sudoku_board_set_cell(board, 0, 0, 5);
+    sudoku_board_set_cell(board, 0, 1, 3);
+    sudoku_board_set_cell(board, 0, 2, 7);
+    sudoku_board_set_cell(board, 4, 4, 9);    
     /* Actualizar estadisticas */
-    sudoku_board_update_stats(&board);
+    sudoku_board_update_stats(board);
     
-    TEST_ASSERT(board.clues == 4, "Clues counter is 4");
-    TEST_ASSERT(board.empty == 77, "Empty counter is 77 (81-4)");
+    TEST_ASSERT(sudoku_board_get_clues(board) == 4, "Clues counter is 4");
+    TEST_ASSERT(sudoku_board_get_empty(board) == 77, "Empty counter is 77 (81-4)");    
     
     printf("  Board after placing 4 numbers:\n");
-    printf("  Clues: %d, Empty: %d\n", board.clues, board.empty);
-    print_test_board(&board);
+    printf("  Clues: %d, Empty: %d\n", sudoku_board_get_clues(board), sudoku_board_get_empty(board));
+    print_test_board(board);
+    sudoku_board_destroy(board);
 }
 
 /**
@@ -184,23 +189,24 @@ void test_subgrid_fill(void) {
     printf("TEST 5: Filling SubGrid - Manual Test\n");
     printf("===============================================================\n");
     
-    SudokuBoard board;
-    sudoku_board_init(&board);
-    
+    SudokuBoard *board = sudoku_board_create();
+    if (board == NULL) {
+    printf("  [FAIL] Could not create board\n");
+    return;
+    }    
     SudokuSubGrid sg = sudoku_subgrid_create(0);  /* Top-left (0,0) */
     
     /* Llenar manualmente con numeros 1-9 */
     int numbers[9] = {5, 3, 7, 6, 2, 1, 9, 8, 4};
     for(int i = 0; i < 9; i++) {
         SudokuPosition pos = sudoku_subgrid_get_position(&sg, i);
-        board.cells[pos.row][pos.col] = numbers[i];
-    }
+        sudoku_board_set_cell(board, pos.row, pos.col, numbers[i]);    }
     
     /* Verificar que se lleno correctamente */
     bool filled_correctly = true;
     for(int i = 0; i < 9; i++) {
         SudokuPosition pos = sudoku_subgrid_get_position(&sg, i);
-        if(board.cells[pos.row][pos.col] != numbers[i]) {
+        if(sudoku_board_get_cell(board, pos.row, pos.col) != numbers[i]){
             filled_correctly = false;
             break;
         }
@@ -209,11 +215,11 @@ void test_subgrid_fill(void) {
     TEST_ASSERT(filled_correctly, "SubGrid 0 filled with correct numbers");
     
     printf("  SubGrid 0 contents:\n");
-    printf("  %d %d %d\n", board.cells[0][0], board.cells[0][1], board.cells[0][2]);
-    printf("  %d %d %d\n", board.cells[1][0], board.cells[1][1], board.cells[1][2]);
-    printf("  %d %d %d\n", board.cells[2][0], board.cells[2][1], board.cells[2][2]);
-    
-    print_test_board(&board);
+    printf("  %d %d %d\n", sudoku_board_get_cell(board, 0, 0), sudoku_board_get_cell(board, 0, 1), sudoku_board_get_cell(board, 0, 2));
+    printf("  %d %d %d\n", sudoku_board_get_cell(board, 1, 0), sudoku_board_get_cell(board, 1, 1), sudoku_board_get_cell(board, 1, 2));
+    printf("  %d %d %d\n", sudoku_board_get_cell(board, 2, 0), sudoku_board_get_cell(board, 2, 1), sudoku_board_get_cell(board, 2, 2));    
+    print_test_board(board);
+    sudoku_board_destroy(board);
 }
 
 /* ================================================================

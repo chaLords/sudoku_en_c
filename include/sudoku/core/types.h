@@ -115,23 +115,19 @@ typedef struct {
  * ═══════════════════════════════════════════════════════════════ */
 
 /**
- * @brief Complete Sudoku board state
+ * @brief Opaque type for Sudoku board
  * 
- * This is the central data structure that represents a Sudoku puzzle.
- * It encapsulates both the grid itself and metadata about filled/empty cells.
+ * This is an opaque pointer type. Clients cannot see the internal
+ * structure and must use the provided API functions to interact
+ * with boards.
  * 
- * Layout matches original exactly:
- *   int cells[SIZE][SIZE]
- *   int clues
- *   int empty
+ * Boards must be created with sudoku_board_create() and destroyed
+ * with sudoku_board_destroy() to ensure proper resource management.
  * 
- * This ensures binary compatibility with existing code during migration.
+ * @note In previous versions, this structure was fully visible.
+ *       This change improves encapsulation and future compatibility.
  */
-typedef struct {
-    int cells[SUDOKU_SIZE][SUDOKU_SIZE];    /**< The 9x9 grid of cell values */
-    int clues;                               /**< Number of filled cells (clues) */
-    int empty;                               /**< Number of empty cells */
-} SudokuBoard;
+typedef struct SudokuBoard SudokuBoard;
 
 /* ═══════════════════════════════════════════════════════════════
  * GENERATION STATISTICS

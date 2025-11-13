@@ -25,12 +25,99 @@
  */
 
 #include <stdio.h>                          // For printf() in verbose generation output
+#include <stdlib.h>                         // Para malloc() y free()
+#include <assert.h>                         // Para validaciones con assert()
 #include "sudoku/core/board.h"              // Our own public header
 #include "sudoku/core/types.h"              // For SUDOKU_SIZE, TOTAL_CELLS, structure definitions
 #include "internal/board_internal.h"        // For internal function declarations
 #include "internal/algorithms_internal.h"   // For sudoku_generate_permutation()
-#include "internal/config_internal.h"                // For VERBOSITY_LEVEL global
+#include "internal/config_internal.h"       // For VERBOSITY_LEVEL global
+// ═══════════════════════════════════════════════════════════════════
+//                    PUBLIC API: MEMORY MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Create a new Sudoku board with dynamic allocation
+ * 
+ * Allocates memory for a new board on the heap and initializes it to
+ * empty state. This is the recommended way to create boards when using
+ * the opaque pointer API.
+ * 
+ * The allocated board must be freed with sudoku_board_destroy() when
+ * no longer needed to prevent memory leaks.
+ * 
+ * @return Pointer to newly created and initialized board, or NULL if
+ *         allocation failed
+ * 
+ * @post If successful, returned board is initialized (all cells = 0,
+ *       clues = 0, empty = 81)
+ * @post If returns NULL, no memory was allocated
+ * 
+ * @note This function internally calls sudoku_board_init() after allocation
+ * @note Always check for NULL return before using the board
+ * 
+ * Example usage:
+ * @code
+ * SudokuBoard *board = sudoku_board_create();
+ * if (board == NULL) {
+ *     fprintf(stderr, "Error: Could not allocate board\n");
+ *     return 1;
+ * }
+ * // Use board...
+ * sudoku_board_destroy(board);
+ * @endcode
+ * 
+ * @see sudoku_board_destroy() to free the allocated memory
+ * @see sudoku_board_init() for stack-allocated board initialization
+ */
+SudokuBoard* sudoku_board_create(void) {
+    // Attempt to allocate memory for the board structure
+    SudokuBoard *board = malloc(sizeof(SudokuBoard));
+    
+    if (board != NULL) {
+        // Allocation successful - initialize to empty state
+        sudoku_board_init(board);
+    }
+    
+    // Return pointer (or NULL if allocation failed)
+    return board;
+}
+
+/**
+ * @brief Destroy a Sudoku board and free its memory
+ * 
+ * Releases all memory associated with a dynamically allocated board.
+ * After calling this function, the board pointer becomes invalid and
+ * must not be dereferenced.
+ * 
+ * This function is safe to call with NULL (it does nothing), following
+ * the convention of standard free().
+ * 
+ * @param[in] board Pointer to board to destroy (can be NULL)
+ * 
+ * @post If board was not NULL, its memory is freed
+ * @post The board pointer is no longer valid after this call
+ * 
+ * @note It is safe to pass NULL to this function
+ * @note Do NOT call this on stack-allocated boards (only on boards
+ *       created with sudoku_board_create())
+ * @note This function does not set the pointer to NULL - the caller
+ *       should do that if they want to avoid use-after-free
+ * 
+ * Example usage:
+ * @code
+ * SudokuBoard *board = sudoku_board_create();
+ * // ... use board ...
+ * sudoku_board_destroy(board);
+ * board = NULL;  // Good practice: prevent use-after-free
+ * @endcode
+ * 
+ * @see sudoku_board_create() to allocate new boards
+ */
+void sudoku_board_destroy(SudokuBoard *board) {
+    // free(NULL) is safe according to C standard - does nothing
+    free(board);
+}
 // ═══════════════════════════════════════════════════════════════════
 //                    PUBLIC API: BOARD INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
@@ -122,7 +209,175 @@ void sudoku_board_update_stats(SudokuBoard *board) {
     board->clues = count;
     board->empty = TOTAL_CELLS - count;
 }
+// ═══════════════════════════════════════════════════════════════════
+//                    PUBLIC API: CELL ACCESS
+// ═══════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Get the value of a specific cell
+ * 
+ * Retrieves the current value at the specified board position.
+ * Provides read-only access to cell data through a controlled interface.
+ * 
+ * @param[in] board Pointer to the board
+ * @param[in] row Row index (0-8)
+ * @param[in] col Column index (0-8)
+ * @return Cell value (0-9), where 0 represents an empty cell and 1-9
+ *         represent the filled numbers
+ * 
+ * @pre board != NULL
+ * @pre 0 <= row < SUDOKU_SIZE
+ * @pre 0 <= col < SUDOKU_SIZE
+ * 
+ * @note Violating preconditions results in assertion failure in debug builds
+ *       and undefined behavior in release builds
+ * @note This function does not modify the board (const parameter)
+ * 
+ * Example usage:
+ * @code
+ * int value = sudoku_board_get_cell(board, 4, 5);
+ * if (value == 0) {
+ *     printf("Cell at (4,5) is empty\n");
+ * } else {
+ *     printf("Cell at (4,5) contains %d\n", value);
+ * }
+ * @endcode
+ * 
+ * @see sudoku_board_set_cell() to modify cell values
+ */
+int sudoku_board_get_cell(const SudokuBoard *board, int row, int col) {
+    // Defensive programming: validate inputs in debug builds
+    assert(board != NULL);
+    assert(row >= 0 && row < SUDOKU_SIZE);
+    assert(col >= 0 && col < SUDOKU_SIZE);
+    
+    // Direct access - will be internal-only once structure is opaque
+    return board->cells[row][col];
+}
+
+/**
+ * @brief Set the value of a specific cell
+ * 
+ * Updates the cell at the specified position with a new value.
+ * Provides controlled write access with parameter validation.
+ * 
+ * Important: This function does NOT perform Sudoku rule validation.
+ * It only validates parameter ranges. Use sudoku_is_safe_position()
+ * before calling this if you need to verify the move is legal according
+ * to Sudoku rules.
+ * 
+ * Important: This function does NOT automatically update board statistics
+ * (clues/empty counts). Call sudoku_board_update_stats() after a series
+ * of modifications if you need accurate statistics.
+ * 
+ * @param[in,out] board Pointer to the board to modify
+ * @param[in] row Row index (0-8)
+ * @param[in] col Column index (0-8)
+ * @param[in] value New cell value (0-9)
+ * @return true if the cell was successfully updated, false if any
+ *         parameter was invalid
+ * 
+ * @pre board != NULL (enforced by return value)
+ * @post If returns true, board->cells[row][col] == value
+ * @post If returns false, board is not modified
+ * 
+ * @note Unlike get_cell(), this uses return value for validation rather
+ *       than assertions, allowing graceful error handling
+ * @note Board statistics are NOT automatically updated
+ * 
+ * Example usage:
+ * @code
+ * if (sudoku_board_set_cell(board, 3, 4, 7)) {
+ *     printf("Successfully set cell (3,4) to 7\n");
+ * } else {
+ *     printf("Invalid parameters\n");
+ * }
+ * @endcode
+ * 
+ * @see sudoku_board_get_cell() to read cell values
+ * @see sudoku_board_update_stats() to refresh statistics after modifications
+ * @see sudoku_is_safe_position() to validate moves according to Sudoku rules
+ */
+bool sudoku_board_set_cell(SudokuBoard *board, int row, int col, int value) {
+    // Comprehensive parameter validation
+    if (board == NULL ||
+        row < 0 || row >= SUDOKU_SIZE ||
+        col < 0 || col >= SUDOKU_SIZE ||
+        value < 0 || value > 9) {
+        return false;  // Invalid parameters - operation rejected
+    }
+    
+    // Parameters valid - update the cell
+    board->cells[row][col] = value;
+    return true;  // Success
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    PUBLIC API: STATISTICS ACCESS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Get the number of filled cells (clues) in the board
+ * 
+ * Returns the cached count of non-zero cells. This count is maintained
+ * by sudoku_board_init() and should be updated via sudoku_board_update_stats()
+ * after manual cell modifications.
+ * 
+ * @param[in] board Pointer to the board
+ * @return Number of filled cells (0-81)
+ * 
+ * @pre board != NULL
+ * 
+ * @note This returns a cached value. After modifying cells with
+ *       sudoku_board_set_cell(), call sudoku_board_update_stats()
+ *       to ensure this value is accurate
+ * 
+ * Example usage:
+ * @code
+ * int difficulty_estimate = sudoku_board_get_clues(board);
+ * if (difficulty_estimate >= 45) {
+ *     printf("This looks like an easy puzzle\n");
+ * }
+ * @endcode
+ * 
+ * @see sudoku_board_get_empty() for the count of empty cells
+ * @see sudoku_board_update_stats() to refresh cached statistics
+ */
+int sudoku_board_get_clues(const SudokuBoard *board) {
+    assert(board != NULL);
+    return board->clues;
+}
+
+/**
+ * @brief Get the number of empty cells in the board
+ * 
+ * Returns the cached count of zero-valued cells. This count is maintained
+ * by sudoku_board_init() and should be updated via sudoku_board_update_stats()
+ * after manual cell modifications.
+ * 
+ * @param[in] board Pointer to the board
+ * @return Number of empty cells (0-81)
+ * 
+ * @pre board != NULL
+ * 
+ * @note This returns a cached value. After modifying cells with
+ *       sudoku_board_set_cell(), call sudoku_board_update_stats()
+ *       to ensure this value is accurate
+ * @note Invariant: get_clues() + get_empty() == 81 (TOTAL_CELLS)
+ * 
+ * Example usage:
+ * @code
+ * int remaining = sudoku_board_get_empty(board);
+ * printf("The puzzle has %d cells left to fill\n", remaining);
+ * @endcode
+ * 
+ * @see sudoku_board_get_clues() for the count of filled cells
+ * @see sudoku_board_update_stats() to refresh cached statistics
+ */
+int sudoku_board_get_empty(const SudokuBoard *board) {
+    assert(board != NULL);
+    return board->empty;
+}
 // ═══════════════════════════════════════════════════════════════════
 //                    PUBLIC API: SUBGRID GEOMETRY
 // ═══════════════════════════════════════════════════════════════════

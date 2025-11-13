@@ -18,8 +18,9 @@
  * restores it to its original state.
  */
 
-#include "sudoku/core/validation.h"  // Our own header with function declarations
-
+#include "sudoku/core/validation.h"
+#include "sudoku/core/types.h"
+#include "internal/board_internal.h"
 // ═══════════════════════════════════════════════════════════════════
 //                    POSITION VALIDATION
 // ═══════════════════════════════════════════════════════════════════

@@ -17,7 +17,8 @@
 #include <stdio.h>
 #include "sudoku/core/display.h"
 #include "sudoku/core/types.h"
-#include "internal/config_internal.h"  
+#include "internal/config_internal.h"
+#include "internal/board_internal.h"        // For internal function declarations
 
 // ═══════════════════════════════════════════════════════════════
 //                    CONSOLE OUTPUT FUNCTIONS

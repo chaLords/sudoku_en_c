@@ -49,7 +49,29 @@ void fillDiagonal(SudokuBoard *board);
 // Actualización de contadores (wrapper)
 void sudoku_board_update_stats(SudokuBoard *board);
 
-// Nota: sudoku_subgrid_create() y sudoku_subgrid_get_position()
-// ya están declaradas en board.h público, no duplicamos aquí
-
+/**
+ * @brief Complete internal definition of SudokuBoard
+ * 
+ * This structure contains the actual implementation of the board.
+ * Client code cannot see this definition - they only work with
+ * SudokuBoard* pointers through the public API.
+ * 
+ * This separation allows us to change the internal representation
+ * in the future without breaking client code.
+ * 
+ * Current layout (v2.2.x compatible):
+ * - cells: 9x9 array of integers (0 = empty, 1-9 = filled)
+ * - clues: cached count of filled cells
+ * - empty: cached count of empty cells
+ * 
+ * Future considerations (v3.0):
+ * - Variable size boards: int size; int *cells;
+ * - Validity caching: bool is_valid; bool validity_cached;
+ * - Solution storage: int *solution;
+ */
+struct SudokuBoard {
+    int cells[SUDOKU_SIZE][SUDOKU_SIZE];    /**< The 9x9 grid of cell values */
+    int clues;                               /**< Number of filled cells (non-zero) */
+    int empty;                               /**< Number of empty cells (zero) */
+};
 #endif // SUDOKU_BOARD_INTERNAL_H
