@@ -170,6 +170,107 @@ typedef enum {
 } SudokuDifficulty;
 
 /* ═══════════════════════════════════════════════════════════════
+ * EVENT SYSTEM FOR GENERATION MONITORING
+ * ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * @brief Types of events that occur during puzzle generation
+ * 
+ * The library emits these events to notify the application about
+ * significant milestones during the generation process. The application
+ * can choose to handle these events (via callbacks) or ignore them.
+ * 
+ * This allows the library to remain presentation-agnostic - it doesn't
+ * care HOW events are displayed, only WHAT happened.
+ */
+typedef enum {
+    SUDOKU_EVENT_GENERATION_START,       /**< Generation process started */
+    SUDOKU_EVENT_DIAGONAL_FILL_START,    /**< Filling diagonal subgrids */
+    SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE, /**< Diagonal filled successfully */
+    SUDOKU_EVENT_BACKTRACK_START,        /**< Backtracking phase started */
+    SUDOKU_EVENT_BACKTRACK_COMPLETE,     /**< Board completion successful */
+    SUDOKU_EVENT_PHASE1_START,           /**< Phase 1 elimination started */
+    SUDOKU_EVENT_PHASE1_CELL_SELECTED,   /**< A cell was selected for removal in phase 1 */
+    SUDOKU_EVENT_PHASE1_COMPLETE,        /**< Phase 1 finished */
+    SUDOKU_EVENT_PHASE2_START,           /**< Phase 2 elimination started */
+    SUDOKU_EVENT_PHASE2_ROUND_START,     /**< New phase 2 iteration started */
+    SUDOKU_EVENT_PHASE2_CELL_SELECTED,   /**< A cell was selected for removal in phase 2 */
+    SUDOKU_EVENT_PHASE2_ROUND_COMPLETE,  /**< Phase 2 round finished */
+    SUDOKU_EVENT_PHASE2_COMPLETE,        /**< Phase 2 finished */
+    SUDOKU_EVENT_PHASE3_START,           /**< Phase 3 elimination started */
+    SUDOKU_EVENT_PHASE3_CELL_TESTING,    /**< Testing if a cell can be removed */
+    SUDOKU_EVENT_PHASE3_CELL_REMOVED,    /**< A cell was successfully removed */
+    SUDOKU_EVENT_PHASE3_CELL_KEPT,       /**< A cell must be kept (removal would break uniqueness) */
+    SUDOKU_EVENT_PHASE3_COMPLETE,        /**< Phase 3 finished */
+    SUDOKU_EVENT_GENERATION_COMPLETE,    /**< Entire generation succeeded */
+    SUDOKU_EVENT_GENERATION_FAILED       /**< Generation failed */
+} SudokuEventType;
+
+/**
+ * @brief Data associated with a generation event
+ * 
+ * Contains contextual information about what happened during generation.
+ * Not all fields are meaningful for all event types - check the event
+ * type to know which fields contain valid data.
+ * 
+ * The board pointer is always valid and points to the current state,
+ * but it's read-only and only valid during the callback execution.
+ */
+typedef struct {
+    SudokuEventType type;       /**< Type of event that occurred */
+    const SudokuBoard *board;   /**< Current board state (read-only, temporary) */
+    
+    /* Phase information */
+    int phase_number;           /**< Which elimination phase (1, 2, or 3) */
+    int cells_removed_total;    /**< Total cells removed so far in this phase */
+    int round_number;           /**< Round/iteration number (mainly for phase 2) */
+    
+    /* Cell-specific information (for cell-related events) */
+    int row;                    /**< Row of the cell in question (-1 if not applicable) */
+    int col;                    /**< Column of the cell in question (-1 if not applicable) */
+    int value;                  /**< Value that was in the cell (0 if not applicable) */
+    
+} SudokuEventData;
+
+/**
+ * @brief Callback function signature for generation events
+ * 
+ * Applications provide a function matching this signature to receive
+ * notifications about generation progress. The library calls this function
+ * whenever something significant happens.
+ * 
+ * The callback should be fast and non-blocking. Don't perform heavy
+ * computations or I/O operations inside the callback, as it runs
+ * synchronously with the generation process.
+ * 
+ * @param event Pointer to event data describing what happened
+ * @param user_data Custom pointer provided by the application when
+ *                  registering the callback (can be NULL)
+ * 
+ * Example callback:
+ * @code
+ * void my_callback(const SudokuEventData *event, void *user_data) {
+ *     if (event->type == SUDOKU_EVENT_PHASE1_COMPLETE) {
+ *         printf("Phase 1 removed %d cells\n", event->cells_removed_total);
+ *     }
+ * }
+ * @endcode
+ */
+typedef void (*SudokuEventCallback)(const SudokuEventData *event, void *user_data);
+
+/**
+ * @brief Configuration for puzzle generation
+ * 
+ * Allows customizing the generation process, including registering
+ * a callback to monitor progress.
+ */
+typedef struct {
+    SudokuEventCallback callback;  /**< Optional callback function (can be NULL) */
+    void *user_data;               /**< Custom data passed to callback (can be NULL) */
+    int max_attempts;              /**< Maximum generation attempts (0 = unlimited) */
+} SudokuGenerationConfig;
+
+/* ═══════════════════════════════════════════════════════════════
  * NOTES ON EXCLUDED TYPES
  * ═══════════════════════════════════════════════════════════════ 
  * 

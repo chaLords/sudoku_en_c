@@ -156,5 +156,52 @@ void sudoku_set_verbosity(int level);
  * @see sudoku_set_verbosity() to change the verbosity level
  */
 int sudoku_get_verbosity(void);
+// ═══════════════════════════════════════════════════════════════════
+//                    GENERATION WITH CALLBACKS (Advanced)
+// ═══════════════════════════════════════════════════════════════════
 
+/**
+ * @brief Generate a Sudoku puzzle with event monitoring
+ * 
+ * This is the advanced generation function that supports progress callbacks.
+ * The library will emit events during generation, allowing the application
+ * to monitor and display progress however it wants.
+ * 
+ * This maintains the separation between library logic (WHAT happens) and
+ * application presentation (HOW it's displayed).
+ * 
+ * @param board Pointer to the board to fill (will be initialized)
+ * @param config Configuration including optional callback function
+ * @param stats Pointer to store generation statistics (can be NULL)
+ * @return true if generation succeeded, false on failure
+ * 
+ * @pre board != NULL
+ * @post If returns true, board contains a valid puzzle with unique solution
+ * 
+ * Example usage:
+ * @code
+ * void my_callback(const SudokuEventData *event, void *user_data) {
+ *     if (event->type == SUDOKU_EVENT_PHASE1_COMPLETE) {
+ *         printf("Phase 1 removed %d cells\n", event->cells_removed_total);
+ *     }
+ * }
+ * 
+ * SudokuGenerationConfig config = {
+ *     .callback = my_callback,
+ *     .user_data = NULL,
+ *     .max_attempts = 10
+ * };
+ * 
+ * SudokuBoard *board = sudoku_board_create();
+ * sudoku_generate_ex(board, &config, NULL);
+ * sudoku_board_destroy(board);
+ * @endcode
+ * 
+ * @note If config is NULL or config->callback is NULL, behaves like sudoku_generate()
+ * @note The callback is called synchronously during generation
+ * @note Keep callbacks fast - don't do heavy computation inside them
+ */
+bool sudoku_generate_ex(SudokuBoard *board,
+                        const SudokuGenerationConfig *config,
+                        SudokuGenerationStats *stats);
 #endif // SUDOKU_CORE_GENERATOR_H

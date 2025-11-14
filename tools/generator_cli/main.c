@@ -1,14 +1,13 @@
-// tools/generator_cli/main.c - REFACTORED VERSION
+// tools/generator_cli/main.c - REFACTORED VERSION WITH CALLBACKS
 
 /**
  * @file main.c
  * @brief CLI tool for generating Sudoku puzzles
  * @author Gonzalo Ramírez
- * @date 2025-11-06
+ * @date 2025-11-13
  * 
  * This command-line interface demonstrates how to use the Sudoku
- * generation library. It serves as both a practical tool and an
- * example of proper library usage.
+ * generation library with event callbacks for monitoring progress.
  */
 
 #include <stdio.h>
@@ -21,6 +20,74 @@
 #include "sudoku/core/generator.h"
 #include "sudoku/core/display.h"
 #include "sudoku/core/validation.h"
+
+// ═══════════════════════════════════════════════════════════════════
+//                    EVENT CALLBACK FOR PROGRESS MONITORING
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Callback function to receive generation events
+ * 
+ * This demonstrates how an application can monitor the generation process.
+ * The library emits events (WHAT happens) and the application decides
+ * HOW to display them. This maintains separation of concerns.
+ */
+void generation_callback(const SudokuEventData *event, void *user_data) {
+    // user_data contains the verbosity level
+    int verbosity = *(int*)user_data;
+    
+    switch (event->type) {
+        case SUDOKU_EVENT_GENERATION_START:
+            // Only show in detailed mode
+            if (verbosity >= 2) {
+                printf("\n🎲 GENERATION START\n");
+                printf("════════════════════════════════════════\n");
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE1_START:
+            if (verbosity >= 2) {
+                printf("\n🎯 PHASE 1: Fisher-Yates Selection\n");
+            } else if (verbosity >= 1) {
+                printf("🚀 Diagonal + Backtracking...");
+                fflush(stdout);
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE1_CELL_SELECTED:
+            // Detailed mode: show each cell removed
+            if (verbosity >= 2) {
+                printf("   Removed %d at (%d,%d) - Total: %d\n",
+                       event->value, event->row, event->col,
+                       event->cells_removed_total);
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE1_COMPLETE:
+            if (verbosity >= 2) {
+                printf("✓ Phase 1 completed: %d cells removed\n",
+                       event->cells_removed_total);
+            } else if (verbosity >= 1) {
+                printf("Phase 1: %d cells removed\n",
+                       event->cells_removed_total);
+            }
+            break;
+            
+        case SUDOKU_EVENT_GENERATION_COMPLETE:
+            if (verbosity >= 2) {
+                printf("\n════════════════════════════════════════\n");
+                printf("✅ GENERATION COMPLETE\n");
+                printf("Final: %d empty, %d clues\n",
+                       sudoku_board_get_empty(event->board),
+                       sudoku_board_get_clues(event->board));
+            }
+            break;
+            
+        default:
+            // Ignore other events for now (Phase 2 and 3 not yet updated)
+            break;
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //                           MAIN FUNCTION
@@ -57,44 +124,46 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    // Use the public API to configure verbosity
-    sudoku_set_verbosity(verbosity_level);
+    // Allocate memory for the board
+    SudokuBoard *board = sudoku_board_create();
+    if (board == NULL) {
+        fprintf(stderr, "Error: No se pudo crear el tablero\n");
+        return 1;
+    }
     
-    // Get current verbosity level for display logic
-    int current_level = sudoku_get_verbosity();
-    
-    // Allocate memory for the board (demonstrates dynamic allocation)
-   SudokuBoard *board = sudoku_board_create();
-if (board == NULL) {
-    fprintf(stderr, "Error: No se pudo crear el tablero\n");
-    return 1;
-}    
     // Structure to store generation statistics
     SudokuGenerationStats stats;
     
     // Display title based on verbosity level
-    if(current_level == 0 || current_level == 1) {
+    if(verbosity_level == 0 || verbosity_level == 1) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("  SUDOKU GENERATOR v2.2.2 – MODULAR ARCHITECTURE\n");
+        printf("  SUDOKU GENERATOR v2.2.3 – MODULAR ARCHITECTURE\n");
         printf("═══════════════════════════════════════════════════════════════\n\n");
-    } else if(current_level == 2) {
+    } else if(verbosity_level == 2) {
         printf("═══════════════════════════════════════════════════════════════\n");
-        printf("    SUDOKU GENERATOR v2.2.2 – MODULAR ARCHITECTURE\n");
+        printf("    SUDOKU GENERATOR v2.2.3 – MODULAR ARCHITECTURE\n");
         printf("           Fisher-Yates + Backtracking + 3 Phases\n");
-        printf("═══════════════════════════════════════════════════════════════\n\n");
+        printf("═══════════════════════════════════════════════════════════════\n");
     }
 
     bool success = false;
     
     // Try up to 5 attempts to generate a valid Sudoku
     for(int attempt = 1; attempt <= 5; attempt++) {
-        if(current_level >= 1) {
+        if(verbosity_level >= 1) {
             printf("🚀 ATTEMPT #%d:\n", attempt);
         }
         
-        // Call the library's generation function
-        if(sudoku_generate(board, &stats)) {
-            if(current_level >= 1) {
+        // Configure generation with callback
+        SudokuGenerationConfig config = {
+            .callback = generation_callback,
+            .user_data = &verbosity_level,  // Pass verbosity to callback
+            .max_attempts = 0
+        };
+        
+        // Call the library's generation function WITH CALLBACK SUPPORT
+        if(sudoku_generate_ex(board, &config, &stats)) {
+            if(verbosity_level >= 1) {
                 printf("✅ SUCCESS! Sudoku generated\n\n");
             }
             
@@ -104,13 +173,13 @@ if (board == NULL) {
             
             // Validate the puzzle for correctness
             if(sudoku_validate_board(board)) {
-                if(current_level >= 1) {
+                if(verbosity_level >= 1) {
                     printf("🎉 VERIFIED! The puzzle is valid\n");
                 }
             }
             
             // Evaluate and display difficulty level
-            if(current_level >= 0) {
+            if(verbosity_level >= 0) {
                 SudokuDifficulty difficulty = sudoku_evaluate_difficulty(board);
                 printf("\n📊 Difficulty level: %s\n", 
                        sudoku_difficulty_to_string(difficulty));
@@ -120,14 +189,15 @@ if (board == NULL) {
             break;
         } else {
             // Only show failures in detailed mode
-            if(current_level == 2) {
+            if(verbosity_level == 2) {
                 printf("❌ Failed (very rare with this method)\n\n");
             }
         }
     }
     
     // Free allocated memory
-    sudoku_board_destroy(board);    
+    sudoku_board_destroy(board);
+    
     // Report final status
     if(!success) {
         fprintf(stderr, "\n❌ ERROR: Could not generate a valid Sudoku after multiple attempts!\n");

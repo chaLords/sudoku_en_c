@@ -4,6 +4,7 @@ set(CORE_SOURCES
     validation.c
     display.c
     generator.c
+    events.c
     config.c
 )
 

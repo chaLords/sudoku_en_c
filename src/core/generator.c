@@ -2,7 +2,7 @@
  * @file generator.c
  * @brief Main API for generating Sudoku puzzles
  * @author Gonzalo Ramírez
- * @date 2025-11-06
+ * @date 2025-11-13
  * 
  * This file provides the main API for generating Sudoku puzzles
  * using the hybrid Fisher-Yates + Backtracking approach with
@@ -24,10 +24,10 @@
 #include "sudoku/core/generator.h"
 #include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
-#include "internal/config_internal.h"
 #include "internal/board_internal.h"
 #include "internal/algorithms_internal.h"
 #include "internal/elimination_internal.h"
+#include "internal/events_internal.h"
 
 // ═══════════════════════════════════════════════════════════════════
 //                    CORE GENERATION FUNCTION
@@ -48,6 +48,7 @@
  * 5. Phase 3: Free elimination with uniqueness verification up to target
  * 
  * @param[out] board Pointer to the board structure to fill (will be initialized)
+ * @param[in] config Configuration including optional callback for progress monitoring
  * @param[out] stats Pointer to store generation statistics, or NULL if not needed
  * @return true if generation succeeded, false on failure (very rare)
  * 
@@ -62,15 +63,27 @@
  * @warning This function uses rand() internally. Call srand(time(NULL))
  *          before first use to ensure different puzzles each execution
  * 
+ * @see sudoku_generate() for simple version without callbacks
  * @see sudoku_generate_with_difficulty() for difficulty-targeted generation
- * @see sudoku_set_verbosity() to control debug output level
  */
-bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
+bool sudoku_generate_ex(SudokuBoard *board,
+                        const SudokuGenerationConfig *config,
+                        SudokuGenerationStats *stats) {
     // Initialize board to completely empty state
     sudoku_board_init(board);
     
+    // Initialize event system
+    if (config != NULL && config->callback != NULL) {
+        events_init(config->callback, config->user_data);
+    } else {
+        events_init(NULL, NULL);  // Disable events
+    }
+    
+    // Emit generation start event
+    emit_event(SUDOKU_EVENT_GENERATION_START, NULL, 0, 0);
+    
     // Initialize statistics structure if provided
-    if(stats) {
+    if (stats) {
         stats->phase1_removed = 0;
         stats->phase2_removed = 0;
         stats->phase2_rounds = 0;
@@ -78,42 +91,20 @@ bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
         stats->total_attempts = 1;  // Count this generation attempt
     }
     
-    // Detailed mode: Show generation start banner
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n🎲 GENERATION START\n");
-        printf("════════════════════════════════════════\n");
-    }
-    
     // STEP 1: Fill diagonal subgrids with Fisher-Yates
     // These three subgrids (0, 4, 8) are independent of each other
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n📐 STEP 1: Filling diagonal subgrids\n");
-    }
-    
     fillDiagonal(board);
-    
-    if(VERBOSITY_LEVEL == 2) {
-        printf("✓ Diagonal filled: 27 cells\n");
-    }
     
     // STEP 2: Complete remaining cells with backtracking
     // Randomized backtracking ensures uniform distribution
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n🔄 STEP 2: Completing board with backtracking\n");
-    }
-    
-    if(!sudoku_complete_backtracking(board)) {
+    if (!sudoku_complete_backtracking(board)) {
         fprintf(stderr, "❌ Error: Failed to complete board\n");
         return false;
     }
     
-    if(VERBOSITY_LEVEL == 2) {
-        printf("✓ Board completed: 81 cells\n");
-    }
-    
     // STEP 3: Create and shuffle indices for random elimination order
     int indices[TOTAL_CELLS];
-    for(int i = 0; i < TOTAL_CELLS; i++) {
+    for (int i = 0; i < TOTAL_CELLS; i++) {
         indices[i] = i;
     }
     
@@ -122,64 +113,56 @@ bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
     
     // PHASE 1: Remove one random number from each subgrid
     // This ensures initial distribution across all regions
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n🎯 PHASE 1: Eliminating one per subgrid\n");
-    }
-    
     int removed1 = phase1Elimination(board, indices, TOTAL_CELLS);
     
-    if(stats) {
+    if (stats) {
         stats->phase1_removed = removed1;
-    }
-    
-    if(VERBOSITY_LEVEL >= 1) {
-        printf("Phase 1: %d cells removed\n", removed1);
     }
     
     // PHASE 2: Remove numbers without alternatives
     // Iteratively removes cells where the number has no valid alternative positions
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n🎲 PHASE 2: Eliminating without alternatives\n");
-    }
-    
     int removed2 = phase2Elimination(board, indices, TOTAL_CELLS);
     
-    if(stats) {
+    if (stats) {
         stats->phase2_removed = removed2;
         stats->phase2_rounds = 1;  // Adjust if tracking rounds internally
     }
     
-    if(VERBOSITY_LEVEL >= 1) {
-        printf("Phase 2: %d cells removed\n", removed2);
-    }
-    
     // PHASE 3: Free elimination with uniqueness verification
     // Attempts to remove up to target cells while maintaining unique solution
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n🔍 PHASE 3: Free elimination with verification\n");
-    }
-    
     int removed3 = phase3Elimination(board, PHASE3_TARGET);
     
-    if(stats) {
+    if (stats) {
         stats->phase3_removed = removed3;
-    }
-    
-    if(VERBOSITY_LEVEL >= 1) {
-        printf("Phase 3: %d cells removed\n", removed3);
     }
     
     // Update final statistics (clues and empty cells count)
     sudoku_board_update_stats(board);
     
-    // Detailed mode: Show completion summary
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n════════════════════════════════════════\n");
-        printf("✅ GENERATION COMPLETE\n");
-        printf("Final: %d empty, %d clues\n", board->empty, board->clues);
-    }
+    // Emit generation complete event
+    emit_event(SUDOKU_EVENT_GENERATION_COMPLETE, board, 0, 0);
     
     return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    SIMPLE WRAPPER (BACKWARD COMPATIBLE)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Generate a Sudoku puzzle (simple version without callbacks)
+ * 
+ * Convenience wrapper that calls sudoku_generate_ex() with no callback.
+ * This maintains backward compatibility with existing code.
+ * 
+ * @param[out] board Pointer to the board structure to fill
+ * @param[out] stats Pointer to store generation statistics, or NULL
+ * @return true if generation succeeded, false on failure
+ * 
+ * @see sudoku_generate_ex() for advanced version with event callbacks
+ */
+bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
+    return sudoku_generate_ex(board, NULL, stats);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -222,17 +205,9 @@ bool sudoku_generate_with_difficulty(SudokuBoard *board,
     // TODO: Adjust elimination parameters based on target difficulty
     bool result = sudoku_generate(board, stats);
     
-    // If successful and verbosity enabled, report difficulty match
-    if(result && VERBOSITY_LEVEL >= 1) {
-        SudokuDifficulty actual = sudoku_evaluate_difficulty(board);
-        
-        // Report if actual difficulty differs from requested
-        if(actual != difficulty) {
-            printf("Note: Requested %s, got %s difficulty\n", 
-                   sudoku_difficulty_to_string(difficulty),
-                   sudoku_difficulty_to_string(actual));
-        }
-    }
+    // Note: Difficulty reporting removed - should be done by application,
+    // not library. The application can call sudoku_evaluate_difficulty()
+    // and display results however it wants.
     
     return result;
 }
@@ -268,11 +243,13 @@ bool sudoku_generate_with_difficulty(SudokuBoard *board,
  * @see sudoku_difficulty_to_string() to convert result to readable format
  */
 SudokuDifficulty sudoku_evaluate_difficulty(const SudokuBoard *board) {
-    if(board->clues >= 45) {
+    int clues = sudoku_board_get_clues(board);
+    
+    if (clues >= 45) {
         return SUDOKU_EASY;
-    } else if(board->clues >= 35) {
+    } else if (clues >= 35) {
         return SUDOKU_MEDIUM;
-    } else if(board->clues >= 25) {
+    } else if (clues >= 25) {
         return SUDOKU_HARD;
     } else {
         return SUDOKU_EXPERT;
@@ -301,7 +278,7 @@ SudokuDifficulty sudoku_evaluate_difficulty(const SudokuBoard *board) {
  * @see sudoku_evaluate_difficulty() to determine puzzle difficulty
  */
 const char* sudoku_difficulty_to_string(SudokuDifficulty difficulty) {
-    switch(difficulty) {
+    switch (difficulty) {
         case SUDOKU_EASY:
             return "EASY";
         case SUDOKU_MEDIUM:

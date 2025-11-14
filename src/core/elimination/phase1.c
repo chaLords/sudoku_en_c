@@ -42,13 +42,12 @@
  * - All phases support configurable verbosity for debugging and education
  */
 
-#include "algorithms_internal.h"   // For sudoku_generate_permutation()
-#include "config_internal.h"                // For VERBOSITY_LEVEL global
-#include "elimination_internal.h"  // For our own function declarations
-#include "board_internal.h"        // For internal function declarations
-#include "sudoku/core/board.h"              // For subgrid utilities
-#include <stdio.h>                          // For printf(), fprintf()
-#include <stdbool.h>                        // For bool type
+#include <stdbool.h>
+#include "algorithms_internal.h"
+#include "elimination_internal.h"
+#include "board_internal.h"        // ← ESTA LÍNEA ES CRÍTICA
+#include "events_internal.h"
+#include "sudoku/core/board.h"
 
 // ═══════════════════════════════════════════════════════════════════
 //                    PHASE 1: BALANCED DISTRIBUTION
@@ -87,19 +86,11 @@
  *       cannot eliminate all solutions)
  * 
  * @note Time complexity: O(n²) where n=9, dominated by subgrid scanning
- * @note Output controlled by VERBOSITY_LEVEL:
- *       Level 0: No output
- *       Level 1: Start and completion messages
- *       Level 2: Detailed per-subgrid reporting
+ * @note Uses event system instead of printf - presentation is handled by callbacks
  */
 int phase1Elimination(SudokuBoard *board, const int *index, int count) {
-    // Verbose mode: show phase start with detailed banner
-    if (VERBOSITY_LEVEL == 2) {
-        printf("🎲 PHASE 1: Selecting numbers per subgrid with Fisher-Yates...\n");
-    } else if (VERBOSITY_LEVEL == 1) {
-        printf("🎲 Phase 1: Fisher-Yates selection...");
-        fflush(stdout);  // Ensure output appears before potentially long operation
-    }
+    // Emit phase start event (replaces all printf for start)
+    emit_event(SUDOKU_EVENT_PHASE1_START, board, 1, 0);
     
     // Generate random permutation of 1-9 to determine which number to remove
     // from each subgrid. Using Fisher-Yates ensures uniform distribution.
@@ -111,11 +102,6 @@ int phase1Elimination(SudokuBoard *board, const int *index, int count) {
     // Process each subgrid in the order specified by index array
     for (int idx = 0; idx < count; idx++) {
         SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx]);
-        
-        if (VERBOSITY_LEVEL == 2) {
-            printf("   Subgrid %d (base: %d,%d): ", 
-                   subgrid.index, subgrid.base.row, subgrid.base.col);
-        }
 
         // Select which number to remove from this subgrid
         int target_value = numbers[idx];
@@ -125,32 +111,25 @@ int phase1Elimination(SudokuBoard *board, const int *index, int count) {
             SudokuPosition pos = sudoku_subgrid_get_position(&subgrid, cell_idx);
             
             if (board->cells[pos.row][pos.col] == target_value) {
-                board->cells[pos.row][pos.col] = 0;  // Remove by setting to 0
+                // IMPORTANT: Save the value BEFORE removing it
+                int removed_value = board->cells[pos.row][pos.col];
+                
+                // Remove the cell
+                board->cells[pos.row][pos.col] = 0;
                 removed++;
                 
-                if (VERBOSITY_LEVEL == 2) {
-                    printf("removed %d at (%d,%d)", 
-                           target_value, pos.row, pos.col);
-                }
+                // Emit cell selected event (replaces printf)
+                emit_event_cell(SUDOKU_EVENT_PHASE1_CELL_SELECTED, board, 1,
+                               removed, pos.row, pos.col, removed_value);
+                
                 break;  // Only remove one occurrence per subgrid
             }
         }
-        
-        if (VERBOSITY_LEVEL == 2) {
-            printf("\n");
-        }
     }
     
-    // Completion messages
-    if (VERBOSITY_LEVEL >= 1) {
-        printf("✅ Phase 1 completed!\n");
-    }
-    
-    if (VERBOSITY_LEVEL >= 1) {
-        printf("📊 PHASE 1 TOTAL: Removed %d cells\n\n", removed);
-    }
+    // Emit phase complete event (replaces all completion printf)
+    emit_event(SUDOKU_EVENT_PHASE1_COMPLETE, board, 1, removed);
     
     return removed;
 }
-
 
