@@ -88,48 +88,50 @@ bool sudoku_generate_ex(SudokuBoard *board,
         stats->phase2_removed = 0;
         stats->phase2_rounds = 0;
         stats->phase3_removed = 0;
-        stats->total_attempts = 1;  // Count this generation attempt
+        stats->total_attempts = 1;
     }
     
     // STEP 1: Fill diagonal subgrids with Fisher-Yates
-    // These three subgrids (0, 4, 8) are independent of each other
     fillDiagonal(board);
     
     // STEP 2: Complete remaining cells with backtracking
-    // Randomized backtracking ensures uniform distribution
     if (!sudoku_complete_backtracking(board)) {
         fprintf(stderr, "❌ Error: Failed to complete board\n");
         return false;
     }
     
-    // STEP 3: Create and shuffle indices for random elimination order
-    int indices[TOTAL_CELLS];
-    for (int i = 0; i < TOTAL_CELLS; i++) {
-        indices[i] = i;
-    }
-    
-    // Shuffle to process cells in random order during elimination
-    sudoku_generate_permutation(indices, TOTAL_CELLS, 0);
-    
+    // ═══════════════════════════════════════════════════════════════
     // PHASE 1: Remove one random number from each subgrid
-    // This ensures initial distribution across all regions
-    int removed1 = phase1Elimination(board, indices, TOTAL_CELLS);
+    // ═══════════════════════════════════════════════════════════════
+    
+    // Create and shuffle cell indices for Phase 1
+   // ✅ CORRECCIÓN: Crear array de índices de SUBGRIDS (0-8), no celdas
+    int subgrid_indices[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    sudoku_generate_permutation(subgrid_indices, 9, 0);  // Mezclar orden
+    
+    int removed1 = phase1Elimination(board, subgrid_indices, 9);
     
     if (stats) {
         stats->phase1_removed = removed1;
-    }
-    
+    }    
+    // ═══════════════════════════════════════════════════════════════
     // PHASE 2: Remove numbers without alternatives
-    // Iteratively removes cells where the number has no valid alternative positions
-    int removed2 = phase2Elimination(board, indices, TOTAL_CELLS);
+    // ═══════════════════════════════════════════════════════════════
+    
+    
+     // Reutilizar el mismo array (ya está mezclado, o mezclar de nuevo)
+    sudoku_generate_permutation(subgrid_indices, 9, 0);
+    
+    int removed2 = phase2Elimination(board, subgrid_indices, 9);
     
     if (stats) {
         stats->phase2_removed = removed2;
-        stats->phase2_rounds = 1;  // Adjust if tracking rounds internally
-    }
-    
+        stats->phase2_rounds = 1;
+    }    
+    // ═══════════════════════════════════════════════════════════════
     // PHASE 3: Free elimination with uniqueness verification
-    // Attempts to remove up to target cells while maintaining unique solution
+    // ═══════════════════════════════════════════════════════════════
+    
     int removed3 = phase3Elimination(board, PHASE3_TARGET);
     
     if (stats) {
@@ -144,7 +146,6 @@ bool sudoku_generate_ex(SudokuBoard *board,
     
     return true;
 }
-
 // ═══════════════════════════════════════════════════════════════════
 //                    SIMPLE WRAPPER (BACKWARD COMPATIBLE)
 // ═══════════════════════════════════════════════════════════════════

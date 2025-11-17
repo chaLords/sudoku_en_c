@@ -5,7 +5,6 @@ set(CORE_SOURCES
     display.c
     generator.c
     events.c
-    config.c
 )
 
 # Archivos de algoritmos

@@ -26,37 +26,63 @@
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Callback function to receive generation events
+ * @brief Callback to handle generation events
  * 
- * This demonstrates how an application can monitor the generation process.
- * The library emits events (WHAT happens) and the application decides
- * HOW to display them. This maintains separation of concerns.
+ * This function receives events from the library and displays them
+ * according to the verbosity level configured by the user.
  */
 void generation_callback(const SudokuEventData *event, void *user_data) {
     // user_data contains the verbosity level
-    int verbosity = *(int*)user_data;
+    int verbosity = *(int *)user_data;
     
     switch (event->type) {
+        // ═══════════════════════════════════════════════════════════
+        // GENERAL EVENTS
+        // ═══════════════════════════════════════════════════════════
         case SUDOKU_EVENT_GENERATION_START:
-            // Only show in detailed mode
-            if (verbosity >= 2) {
-                printf("\n🎲 GENERATION START\n");
-                printf("════════════════════════════════════════\n");
+            if (verbosity >= 1) {
+                printf("🎯 GENERATION START\n");
             }
             break;
             
+        case SUDOKU_EVENT_DIAGONAL_FILL_START:
+            if (verbosity == 2) {
+                printf("🎲 Filling diagonal with Fisher-Yates...\n");
+            }
+            break;
+            
+        case SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE:
+            if (verbosity >= 1) {
+                printf("✅ Diagonal successfully filled!\n");
+            }
+            break;
+            
+        case SUDOKU_EVENT_BACKTRACK_START:
+            if (verbosity >= 1) {
+                printf("🔄 Diagonal + Backtracking...\n");
+            }
+            break;
+            
+        case SUDOKU_EVENT_BACKTRACK_COMPLETE:
+            if (verbosity >= 1) {
+                printf("✅ Completed!\n");
+            }
+            break;
+        
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 1 EVENTS
+        // ═══════════════════════════════════════════════════════════
         case SUDOKU_EVENT_PHASE1_START:
-            if (verbosity >= 2) {
-                printf("\n🎯 PHASE 1: Fisher-Yates Selection\n");
-            } else if (verbosity >= 1) {
-                printf("🚀 Diagonal + Backtracking...");
+            if (verbosity == 2) {
+                printf("🎲 PHASE 1: Fisher-Yates Selection\n");
+            } else if (verbosity == 1) {
+                printf("🎲 Phase 1: Fisher-Yates selection...");
                 fflush(stdout);
             }
             break;
             
         case SUDOKU_EVENT_PHASE1_CELL_SELECTED:
-            // Detailed mode: show each cell removed
-            if (verbosity >= 2) {
+            if (verbosity == 2) {
                 printf("   Removed %d at (%d,%d) - Total: %d\n",
                        event->value, event->row, event->col,
                        event->cells_removed_total);
@@ -64,31 +90,92 @@ void generation_callback(const SudokuEventData *event, void *user_data) {
             break;
             
         case SUDOKU_EVENT_PHASE1_COMPLETE:
-            if (verbosity >= 2) {
-                printf("✓ Phase 1 completed: %d cells removed\n",
+            if (verbosity == 2) {
+                printf("✅ Phase 1 completed: %d cells removed\n\n",
                        event->cells_removed_total);
-            } else if (verbosity >= 1) {
-                printf("Phase 1: %d cells removed\n",
+            } else if (verbosity == 1) {
+                printf("✅ %d cells removed\n\n", event->cells_removed_total);
+            }
+            break;
+        
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 2 EVENTS
+        // ═══════════════════════════════════════════════════════════
+        case SUDOKU_EVENT_PHASE2_START:
+            if (verbosity == 2) {
+                printf("🎲 PHASE 2: Heuristic Elimination\n");
+            } else if (verbosity == 1) {
+                printf("🎲 Phase 2: Heuristic elimination...");
+                fflush(stdout);
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE2_CELL_SELECTED:
+            if (verbosity == 2) {
+                printf("   Removed %d at (%d,%d) - Total: %d\n",
+                       event->value, event->row, event->col,
                        event->cells_removed_total);
             }
             break;
             
+        case SUDOKU_EVENT_PHASE2_COMPLETE:
+            if (verbosity == 2) {
+                printf("✅ Phase 2 completed: %d cells removed\n\n",
+                       event->cells_removed_total);
+            } else if (verbosity == 1) {
+                printf("✅ %d cells removed\n\n", event->cells_removed_total);
+            }
+            break;
+        
+        // ═══════════════════════════════════════════════════════════
+        // PHASE 3 EVENTS
+        // ═══════════════════════════════════════════════════════════
+        case SUDOKU_EVENT_PHASE3_START:
+            if (verbosity == 2) {
+                printf("🎲 PHASE 3: Exhaustive Verification\n");
+            } else if (verbosity == 1) {
+                printf("🎲 Phase 3: Free elimination...");
+                fflush(stdout);
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE3_CELL_REMOVED:
+            if (verbosity == 2) {
+                printf("   Removed %d at (%d,%d) - Total: %d\n",
+                       event->value, event->row, event->col,
+                       event->cells_removed_total);
+            }
+            break;
+            
+        case SUDOKU_EVENT_PHASE3_COMPLETE:
+            if (verbosity == 2) {
+                printf("✅ Phase 3 completed: %d cells removed\n\n",
+                       event->cells_removed_total);
+            } else if (verbosity == 1) {
+                printf("✅ %d cells removed\n\n", event->cells_removed_total);
+            }
+            break;
+        
+        // ═══════════════════════════════════════════════════════════
+        // COMPLETION EVENTS
+        // ═══════════════════════════════════════════════════════════
         case SUDOKU_EVENT_GENERATION_COMPLETE:
-            if (verbosity >= 2) {
-                printf("\n════════════════════════════════════════\n");
+            if (verbosity >= 1) {
                 printf("✅ GENERATION COMPLETE\n");
-                printf("Final: %d empty, %d clues\n",
-                       sudoku_board_get_empty(event->board),
-                       sudoku_board_get_clues(event->board));
+            }
+            break;
+            
+        case SUDOKU_EVENT_GENERATION_FAILED:
+            if (verbosity >= 1) {
+                printf("❌ Generation failed\n");
             }
             break;
             
         default:
-            // Ignore other events for now (Phase 2 and 3 not yet updated)
+            // Unknown event type - ignore
             break;
     }
 }
-
 // ═══════════════════════════════════════════════════════════════════
 //                           MAIN FUNCTION
 // ═══════════════════════════════════════════════════════════════════

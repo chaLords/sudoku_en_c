@@ -24,14 +24,12 @@
  * as internal and are not part of the public API surface.
  */
 
-#include <stdio.h>                          // For printf() in verbose generation output
 #include <stdlib.h>                         // Para malloc() y free()
 #include <assert.h>                         // Para validaciones con assert()
 #include "sudoku/core/board.h"              // Our own public header
 #include "sudoku/core/types.h"              // For SUDOKU_SIZE, TOTAL_CELLS, structure definitions
 #include "internal/board_internal.h"        // For internal function declarations
 #include "internal/algorithms_internal.h"   // For sudoku_generate_permutation()
-#include "internal/config_internal.h"       // For VERBOSITY_LEVEL global
 // ═══════════════════════════════════════════════════════════════════
 //                    PUBLIC API: MEMORY MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════
@@ -515,8 +513,8 @@ static const int DIAGONAL_INDICES[3] = {0, 4, 8};
  * @pre sg represents one of the three diagonal subgrids for conflict-free filling
  * @post All 9 cells in the subgrid contain unique numbers 1-9
  * 
- * @note This function produces verbose output when VERBOSITY_LEVEL == 2
  * @note Uses sudoku_generate_permutation() which implements Fisher-Yates shuffle
+ * @note This function is silent - progress events are emitted by the caller in generator.c
  * 
  * @internal This is an internal helper not exposed in public API
  */
@@ -525,25 +523,11 @@ void fillSubGrid(SudokuBoard *board, const SudokuSubGrid *sg) {
     int numbers[SUDOKU_SIZE];
     sudoku_generate_permutation(numbers, SUDOKU_SIZE, 1);
     
-    // Verbose mode: show which subgrid we're filling and its location
-    if(VERBOSITY_LEVEL == 2) {
-        printf("   SubGrid %d (base: %d,%d): ", 
-               sg->index, sg->base.row, sg->base.col);
-    }
-    
-    // Place each number in the corresponding cell of the subgrid
+       // Place each number in the corresponding cell of the subgrid
     for(int i = 0; i < SUDOKU_SIZE; i++) {
         SudokuPosition pos = sudoku_subgrid_get_position(sg, i);
         board->cells[pos.row][pos.col] = numbers[i];
         
-        // Verbose mode: show the numbers being placed
-        if(VERBOSITY_LEVEL == 2) {
-            printf("%d ", numbers[i]);
-        }
-    }
-    
-    if(VERBOSITY_LEVEL == 2) {
-        printf("\n");
     }
 }
 
@@ -569,30 +553,18 @@ void fillSubGrid(SudokuBoard *board, const SudokuSubGrid *sg) {
  * @post Subgrids 0, 4, 8 contain random valid permutations of 1-9
  * @post 27 cells are filled, 54 remain empty
  * 
- * @note Output verbosity controlled by global VERBOSITY_LEVEL:
- *       - Level 1: Single line progress indicator
- *       - Level 2: Detailed per-subgrid output
- *       - Other: No output
+ * @note This function is silent - SUDOKU_EVENT_DIAGONAL_FILL_START and
+ *       SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE events are emitted from generator.c
+ * @note Progress display is handled by the application's event callback
  * 
  * @internal This is an internal helper not exposed in public API
  */
 void fillDiagonal(SudokuBoard *board) {
-    // Compact mode: show combined phase indicator
-    if(VERBOSITY_LEVEL == 2) {
-        printf("🎲 Filling diagonal with Fisher-Yates...\n");
-    } else if(VERBOSITY_LEVEL == 1) {
-        printf("🎲 Diagonal + Backtracking...");
-        fflush(stdout);  // Ensure output appears before potentially long backtracking
-    }
-    
+        
     // Fill each of the three independent diagonal subgrids
     for(int i = 0; i < 3; i++) {
         SudokuSubGrid sg = sudoku_subgrid_create(DIAGONAL_INDICES[i]);
         fillSubGrid(board, &sg);
     }
     
-    // Detailed mode: show completion confirmation
-    if(VERBOSITY_LEVEL == 2) {
-        printf("✅ Diagonal successfully filled!\n\n");
-    }
 }

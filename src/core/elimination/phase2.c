@@ -42,12 +42,11 @@
  * - All phases support configurable verbosity for debugging and education
  */
 
-#include "config_internal.h"                // For VERBOSITY_LEVEL global
 #include "elimination_internal.h"           // For our own function declarations
-#include "board_internal.h"                 // For internal function declarations
+#include "board_internal.h"                 // For SudokuBoard structure (needs direct cell access)
+#include "events_internal.h"                // For internal function events
 #include "sudoku/core/validation.h"         // For sudoku_is_safe_position(), countSolutionsExact()
 #include "sudoku/core/board.h"              // For subgrid utilities
-#include <stdio.h>                          // For printf(), fprintf()
 #include <stdbool.h>                        // For bool type
 
 // ═══════════════════════════════════════════════════════════════════
@@ -196,20 +195,14 @@ bool hasAlternative(SudokuBoard *board, const SudokuPosition *pos, int num) {
  *       more aggressive elimination, at cost of increased runtime
  */
 int phase2Elimination(SudokuBoard *board, const int *index, int count) {
-    if (VERBOSITY_LEVEL == 2) {
-        printf("🎲 PHASE 2: Selecting numbers without alternatives...\n");
-    }
+    // ✅ EVENTO: Inicio de Phase 2
+    emit_event(SUDOKU_EVENT_PHASE2_START, board, 2, 0);
 
     int removed = 0;
     
     // Process each subgrid in shuffled order
     for (int idx = 0; idx < count; idx++) {
         SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx]);
-        
-        if (VERBOSITY_LEVEL == 2) {
-            printf("   Subgrid %d (base: %d,%d): ", 
-                   subgrid.index, subgrid.base.row, subgrid.base.col);
-        }
         
         // Check each cell in this subgrid
         for (int cell_idx = 0; cell_idx < SUDOKU_SIZE; cell_idx++) {
@@ -224,27 +217,25 @@ int phase2Elimination(SudokuBoard *board, const int *index, int count) {
                     // No alternatives means it's locked to this position
                     // Safe to remove without creating ambiguity
                     board->cells[pos.row][pos.col] = 0;
-
-                    if (VERBOSITY_LEVEL == 2) {
-                        printf("removed %d at (%d,%d) ", num, pos.row, pos.col);
-                    }
-
                     removed++;
+                    
+                    // ✅ EVENTO: Celda removida en Phase 2
+                    emit_event_cell(SUDOKU_EVENT_PHASE2_CELL_SELECTED,
+                                    board,
+                                    2,           // phase_number
+                                    removed,     // cells_removed_total
+                                    pos.row,     // row
+                                    pos.col,     // col
+                                    num);        // value
+
                     break;  // Only one removal per subgrid per round
                 }
             }
         }
-        
-        if (VERBOSITY_LEVEL == 2) {
-            printf("\n");
-        }
     }
     
-    if (VERBOSITY_LEVEL == 2) {
-        printf("✅ Phase 2 completed! Removed: %d\n\n", removed);
-    }
+    // ✅ EVENTO: Phase 2 completada
+    emit_event(SUDOKU_EVENT_PHASE2_COMPLETE, board, 2, removed);
 
     return removed;
 }
-
-

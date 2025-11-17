@@ -42,10 +42,10 @@
  * - All phases support configurable verbosity for debugging and education
  */
 
-#include "config_internal.h"                // For VERBOSITY_LEVEL global
 #include "elimination_internal.h"  // For our own function declarations
 #include "board_internal.h"        // For internal function declarations
 #include "sudoku/core/validation.h"         // For sudoku_is_safe_position(), countSolutionsExact()
+#include "events_internal.h"
 #include <stdlib.h>                         // For malloc(), free(), rand()
 #include <stdio.h>                          // For printf(), fprintf()
 #include <stdbool.h>                        // For bool type
@@ -104,26 +104,17 @@
  *          with 40+ empty cells, individual verifications can take seconds.
  */
 int phase3Elimination(SudokuBoard *board, int target) {
-    if (VERBOSITY_LEVEL == 2) {
-        printf("🎲 PHASE 3: Free elimination with unique solution verification...\n");
-    } else if (VERBOSITY_LEVEL == 1) {
-        printf("🎲 Phase 3: Free elimination...");
-        fflush(stdout);
-    }
+    // ✅ EVENTO: Inicio de Phase 3
+    emit_event(SUDOKU_EVENT_PHASE3_START, board, 3, 0);
     
     // Allocate dynamic memory for position array
-    // We use dynamic allocation rather than stack array because:
-    // 1. Array size depends on runtime board state (number of filled cells)
-    // 2. Large stack arrays (81 positions × sizeof(SudokuPosition)) could
-    //    overflow stack in deeply nested contexts
-    // 3. Allows graceful failure handling if allocation fails
     SudokuPosition *positions = (SudokuPosition *)malloc(
         TOTAL_CELLS * sizeof(SudokuPosition)
     );
     
     if (positions == NULL) {
         fprintf(stderr, "Error: Memory allocation failed in phase3Elimination\n");
-        return 0;  // Return 0 removals on allocation failure
+        return 0;
     }
     
     int filled_count = 0;
@@ -139,9 +130,7 @@ int phase3Elimination(SudokuBoard *board, int target) {
         }
     }
     
-    // Shuffle positions using Fisher-Yates for random processing order
-    // This ensures different elimination patterns across different runs,
-    // increasing variety in generated puzzles
+    // Shuffle positions using Fisher-Yates
     for (int i = filled_count - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         SudokuPosition temp = positions[i];
@@ -159,29 +148,30 @@ int phase3Elimination(SudokuBoard *board, int target) {
         // Temporarily remove the cell
         board->cells[pos.row][pos.col] = 0;
         
-        // Count solutions with limit=2 (we only need to distinguish 1 vs >1)
-        // This is the expensive operation - potentially explores millions of states
+        // Count solutions with limit=2
         if (countSolutionsExact(board, 2) == 1) {
             // Exactly one solution: keep the removal
             removed++;
             
-            if (VERBOSITY_LEVEL == 2) {
-                printf("   Removed %d at (%d,%d) - Total: %d\n", 
-                       original_value, pos.row, pos.col, removed);
-            }
+            // ✅ EVENTO: Celda removida exitosamente en Phase 3
+            emit_event_cell(SUDOKU_EVENT_PHASE3_CELL_REMOVED,
+                            board,
+                            3,               // phase_number
+                            removed,         // cells_removed_total
+                            pos.row,         // row
+                            pos.col,         // col
+                            original_value); // value
         } else {
             // Multiple solutions or no solution: restore the cell
-            // This removal would make puzzle ambiguous or unsolvable
             board->cells[pos.row][pos.col] = original_value;
         }
     }
     
-    // Free dynamically allocated memory (critical to avoid memory leak!)
+    // Free dynamically allocated memory
     free(positions);
     
-    if (VERBOSITY_LEVEL >= 1) {
-        printf("✅ Phase 3 completed! Removed: %d\n", removed);
-    }
+    // ✅ EVENTO: Phase 3 completada
+    emit_event(SUDOKU_EVENT_PHASE3_COMPLETE, board, 3, removed);
     
     return removed;
 }

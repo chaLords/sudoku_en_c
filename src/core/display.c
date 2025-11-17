@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include "sudoku/core/display.h"
 #include "sudoku/core/types.h"
-#include "internal/config_internal.h"
 #include "internal/board_internal.h"        // For internal function declarations
 
 // ═══════════════════════════════════════════════════════════════
@@ -108,11 +107,8 @@ void sudoku_display_print_board(const SudokuBoard *board) {
     
     // Bottom border with corners and horizontal lines
     printf("└───────┴───────┴───────┘\n");
-    
     // Optional statistics display controlled by verbosity level
-    if(VERBOSITY_LEVEL >= 1) {
-        printf("📊 Empty: %d | Clues: %d\n", board->empty, board->clues);
-    }
+    printf("📊 Empty: %d | Clues: %d\n", board->empty, board->clues);
 }
 
 // ═══════════════════════════════════════════════════════════════
