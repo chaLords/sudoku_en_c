@@ -1,177 +1,256 @@
 /**
  * @file types.h
- * @brief Core type definitions for Sudoku library
+ * @brief Core type definitions for Sudoku game
  * @author Gonzalo Ramírez
- * @date 2025-10-19
+ * @date 2025-11-18
  * 
- * This file defines all fundamental data structures and constants used
- * throughout the Sudoku library. These types form the vocabulary of the API.
+ * This header defines the fundamental data structures used throughout
+ * the Sudoku library. The main structure, SudokuBoard, now supports
+ * configurable board sizes (not just 9×9).
  * 
- * Design decisions:
- * - Uses 'int' for compatibility with existing code (can optimize to uint8_t later)
- * - Excludes unused types (SolutionBoard, PlayerBoard) until needed
- * - Constants use expressions to maintain semantic relationships
+ * Supported sizes:
+ * - 2×2 subgrids → 4×4 board (16 cells)
+ * - 3×3 subgrids → 9×9 board (81 cells) [default]
+ * - 4×4 subgrids → 16×16 board (256 cells)
+ * - 5×5 subgrids → 25×25 board (625 cells)
  */
 
-#ifndef SUDOKU_CORE_TYPES_H
-#define SUDOKU_CORE_TYPES_H
+#ifndef SUDOKU_TYPES_H
+#define SUDOKU_TYPES_H
 
 #include <stdbool.h>
-#include <stdint.h>
 
-/* ═══════════════════════════════════════════════════════════════
- * BOARD DIMENSIONS
- * ═══════════════════════════════════════════════════════════════ */
-
-/**
- * @brief Size of the Sudoku grid (9x9)
- * 
- * This is the fundamental dimension of a standard Sudoku board.
- * Changing this value would allow the code to work with variant
- * Sudoku sizes (4x4, 16x16, etc.) if other parts were generalized.
- */
-#define SUDOKU_SIZE 9
+// ═══════════════════════════════════════════════════════════════════
+//                    DEFAULT SIZE CONSTANTS
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Size of each 3x3 subgrid
- * 
- * Standard Sudoku divides the 9x9 board into nine 3x3 regions.
- * This constant expresses the mathematical relationship that
- * SUBGRID_SIZE squared equals SUDOKU_SIZE.
+ * Default subgrid size (3×3) for classic Sudoku
+ * Used when creating boards without specifying size
  */
-#define SUBGRID_SIZE 3
+#define SUDOKU_DEFAULT_SUBGRID_SIZE 3
 
 /**
- * @brief Total number of cells in the board
- * 
- * Computed as SUDOKU_SIZE squared rather than hardcoded as 81.
- * This maintains the semantic relationship that total cells
- * equals the board dimensions squared, making the code more
- * maintainable and self-documenting.
+ * Default board size (9×9) for classic Sudoku
+ * Calculated as SUDOKU_DEFAULT_SUBGRID_SIZE²
  */
-#define TOTAL_CELLS (SUDOKU_SIZE * SUDOKU_SIZE)
+#define SUDOKU_DEFAULT_BOARD_SIZE 9
 
-/* ═══════════════════════════════════════════════════════════════
- * GENERATION PARAMETERS
- * ═══════════════════════════════════════════════════════════════ */
+/**
+ * Default total cells (81) for classic Sudoku
+ * Calculated as SUDOKU_DEFAULT_BOARD_SIZE²
+ */
+#define SUDOKU_DEFAULT_TOTAL_CELLS 81
+
+// ═══════════════════════════════════════════════════════════════════
+//                    GENERATION PARAMETERS
+// ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Target number of cells to remove in Phase 3
  * 
  * Phase 3 of the generation algorithm attempts to remove up to
  * this many additional cells while maintaining a unique solution.
- * This value affects the final difficulty of generated puzzles.
+ * 
+ * @deprecated This constant is hardcoded for 9×9 boards and will be
+ *             replaced with a dynamic calculation in Phase 3 refactoring.
+ *             For configurable sizes, Phase 3 should remove approximately
+ *             30% of total_cells instead of a fixed value.
+ * 
+ * TODO (Phase 3): Replace with dynamic calculation:
+ *       phase3_target = (board->total_cells * 3) / 10;  // 30% of cells
  */
 #define PHASE3_TARGET 25
 
-/* ═══════════════════════════════════════════════════════════════
- * BASIC TYPES
- * ═══════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════
+//                    BACKWARD COMPATIBILITY (Deprecated)
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Type for a single cell value
+ * @deprecated Use board->board_size instead of this constant
  * 
- * Using 'int' for compatibility with existing code.
- * Valid range: 0-9, where 0 represents an empty cell
- * and 1-9 represent the filled numbers.
- * 
- * Note: Could be optimized to uint8_t in future for memory efficiency.
+ * This constant is maintained for backward compatibility with code
+ * that directly uses SUDOKU_SIZE. New code should use the board's
+ * dynamic size fields instead.
  */
-typedef int CellValue;
-
-/* ═══════════════════════════════════════════════════════════════
- * GEOMETRIC STRUCTURES
- * ═══════════════════════════════════════════════════════════════ */
+#define SUDOKU_SIZE SUDOKU_DEFAULT_BOARD_SIZE
 
 /**
- * @brief Represents a position (row, column) on the board
+ * @deprecated Use board->subgrid_size instead of this constant
+ */
+#define SUBGRID_SIZE SUDOKU_DEFAULT_SUBGRID_SIZE
+
+/**
+ * @deprecated Use board->total_cells instead of this constant
+ */
+#define TOTAL_CELLS SUDOKU_DEFAULT_TOTAL_CELLS
+
+// ═══════════════════════════════════════════════════════════════════
+//                    POSITION STRUCTURE
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Represents a position on the Sudoku board
  * 
- * This structure avoids passing multiple row/col parameters
- * separately, making function signatures cleaner and less error-prone.
- * 
- * Layout matches original: int row, int col
+ * Zero-indexed coordinates where (0,0) is the top-left cell
+ * and (board_size-1, board_size-1) is the bottom-right cell.
  */
 typedef struct {
-    int row;        /**< Row index (0-8) */
-    int col;        /**< Column index (0-8) */
+    int row;    ///< Row index (0 to board_size-1)
+    int col;    ///< Column index (0 to board_size-1)
 } SudokuPosition;
 
+// ═══════════════════════════════════════════════════════════════════
+//                    BOARD STRUCTURE (Configurable Size)
+// ═══════════════════════════════════════════════════════════════════
+
 /**
- * @brief Defines a 3x3 subgrid region of the board
+ * @brief Main Sudoku board structure with configurable dimensions
  * 
- * Sudoku boards are divided into 9 subgrids numbered 0-8.
- * Each subgrid has a base position (top-left corner) that
- * determines which cells belong to it.
+ * This structure now supports boards of different sizes, not just 9×9.
+ * The board is represented as a 2D array allocated dynamically based
+ * on the subgrid size.
  * 
- * Layout matches original: int index, Position base
+ * Memory management:
+ * - Create with: sudoku_board_create_size(subgrid_size)
+ * - Destroy with: sudoku_board_destroy(board)
+ * 
+ * Example sizes:
+ * - subgrid_size=2: 4×4 board (16 cells)
+ * - subgrid_size=3: 9×9 board (81 cells)
+ * - subgrid_size=4: 16×16 board (256 cells)
+ * 
+ * @note The cells array is dynamically allocated on the heap
+ * @note This is now an opaque structure - use accessor functions
  */
 typedef struct {
-    int index;                  /**< Subgrid index (0-8) */
-    SudokuPosition base;        /**< Top-left corner position */
-} SudokuSubGrid;
+    // ─────────────────────────────────────────────────────────────
+    //  Dimension Configuration
+    // ─────────────────────────────────────────────────────────────
+    
+    /**
+     * Size of each subgrid (e.g., 3 for 3×3 subgrids in classic Sudoku)
+     * Valid range: 2-5 (larger sizes may be computationally expensive)
+     */
+    int subgrid_size;
+    
+    /**
+     * Size of the board (subgrid_size²)
+     * For classic Sudoku: 3² = 9
+     * For mini Sudoku: 2² = 4
+     * For mega Sudoku: 4² = 16
+     */
+    int board_size;
+    
+    /**
+     * Total number of cells in the board (board_size²)
+     * For classic Sudoku: 9² = 81
+     * For mini Sudoku: 4² = 16
+     * For mega Sudoku: 16² = 256
+     */
+    int total_cells;
+    
+    // ─────────────────────────────────────────────────────────────
+    //  Board Data (Dynamic Allocation)
+    // ─────────────────────────────────────────────────────────────
+    
+    /**
+     * 2D array representing the board cells [board_size][board_size]
+     * 
+     * Values:
+     * - 0: Empty cell
+     * - 1 to board_size: Valid numbers
+     * 
+     * Memory: Dynamically allocated on the heap
+     * Access: board->cells[row][col]
+     * 
+     * @note Do not access directly if structure is opaque
+     * @note Use sudoku_board_get_cell() and sudoku_board_set_cell()
+     */
+    int **cells;
+    
+    // ─────────────────────────────────────────────────────────────
+    //  Board Statistics
+    // ─────────────────────────────────────────────────────────────
+    
+    /**
+     * Number of filled cells (non-zero values)
+     * Range: 0 to total_cells
+     */
+    int clues;
+    
+    /**
+     * Number of empty cells (zero values)
+     * Range: 0 to total_cells
+     * Invariant: clues + empty = total_cells
+     */
+    int empty;
+} SudokuBoard;
 
-/* ═══════════════════════════════════════════════════════════════
- * BOARD STRUCTURE
- * ═══════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════
+//                    SUBGRID STRUCTURE
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Opaque type for Sudoku board
+ * @brief Represents a single subgrid within the board
  * 
- * This is an opaque pointer type. Clients cannot see the internal
- * structure and must use the provided API functions to interact
- * with boards.
+ * In classic 9×9 Sudoku, there are 9 subgrids of 3×3 cells each.
+ * In general, there are board_size subgrids of subgrid_size² cells each.
  * 
- * Boards must be created with sudoku_board_create() and destroyed
- * with sudoku_board_destroy() to ensure proper resource management.
- * 
- * @note In previous versions, this structure was fully visible.
- *       This change improves encapsulation and future compatibility.
+ * Subgrids are indexed in row-major order (left to right, top to bottom).
+ * For classic Sudoku:
+ * @code
+ *  0 | 1 | 2
+ * ---+---+---
+ *  3 | 4 | 5
+ * ---+---+---
+ *  6 | 7 | 8
+ * @endcode
  */
-typedef struct SudokuBoard SudokuBoard;
+typedef struct {
+    int index;              ///< Subgrid index (0 to board_size-1)
+    SudokuPosition base;    ///< Top-left corner position of this subgrid
+} SudokuSubGrid;
 
-/* ═══════════════════════════════════════════════════════════════
- * GENERATION STATISTICS
- * ═══════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════
+//                    GENERATION STATISTICS
+// ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Statistics collected during puzzle generation
  * 
- * This structure tracks information about how a puzzle was generated,
- * including the number of cells removed in each phase and how many
- * attempts were needed.
- * 
- * Layout matches original GenerationStats exactly.
+ * Tracks how many cells were removed in each elimination phase,
+ * providing insight into the generation process and difficulty.
  */
 typedef struct {
-    int phase1_removed;     /**< Cells removed in phase 1 (Fisher-Yates selection) */
-    int phase2_removed;     /**< Cells removed in phase 2 (no alternatives) */
-    int phase2_rounds;      /**< Number of rounds in phase 2 */
-    int phase3_removed;     /**< Cells removed in phase 3 (free elimination) */
-    int total_attempts;     /**< Total generation attempts before success */
+    int phase1_removed;     ///< Cells removed in Phase 1 (Fisher-Yates selection)
+    int phase2_removed;     ///< Cells removed in Phase 2 (heuristic elimination)
+    int phase2_rounds;      ///< Number of rounds Phase 2 took
+    int phase3_removed;     ///< Cells removed in Phase 3 (exhaustive verification)
+    int total_attempts;     /// SE AGREGO PERO TENGO DUDA... LO PIDIO generator.c
 } SudokuGenerationStats;
 
-/* ═══════════════════════════════════════════════════════════════
- * DIFFICULTY LEVELS
- * ═══════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════
+//                    DIFFICULTY LEVELS
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Difficulty levels for generated puzzles
+ * @brief Difficulty classification for generated puzzles
  * 
- * Difficulty is determined primarily by the number of clues (filled cells).
- * Fewer clues generally make the puzzle harder to solve.
- * 
- * These thresholds match the logic in evaluateDifficulty() function.
+ * Based on the number of clues remaining after generation.
+ * Thresholds may need adjustment for non-standard board sizes.
  */
 typedef enum {
-    SUDOKU_EASY,        /**< Easy difficulty (45+ clues) */
-    SUDOKU_MEDIUM,      /**< Medium difficulty (35-44 clues) */
-    SUDOKU_HARD,        /**< Hard difficulty (25-34 clues) */
-    SUDOKU_EXPERT       /**< Expert difficulty (<25 clues) */
+    SUDOKU_EASY,        ///< Many clues (45+ for 9×9)
+    SUDOKU_MEDIUM,      ///< Moderate clues (35-44 for 9×9)
+    SUDOKU_HARD,        ///< Few clues (25-34 for 9×9)
+    SUDOKU_EXPERT,      ///< Very few clues (<25 for 9×9)
+    SUDOKU_INVALID      ///< Invalid board state
 } SudokuDifficulty;
 
-/* ═══════════════════════════════════════════════════════════════
- * EVENT SYSTEM FOR GENERATION MONITORING
- * ═══════════════════════════════════════════════════════════════ */
+// ═══════════════════════════════════════════════════════════════════
+//                    EVENT SYSTEM FOR GENERATION MONITORING
+// ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Types of events that occur during puzzle generation
@@ -184,26 +263,26 @@ typedef enum {
  * care HOW events are displayed, only WHAT happened.
  */
 typedef enum {
-    SUDOKU_EVENT_GENERATION_START,       /**< Generation process started */
-    SUDOKU_EVENT_DIAGONAL_FILL_START,    /**< Filling diagonal subgrids */
-    SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE, /**< Diagonal filled successfully */
-    SUDOKU_EVENT_BACKTRACK_START,        /**< Backtracking phase started */
-    SUDOKU_EVENT_BACKTRACK_COMPLETE,     /**< Board completion successful */
-    SUDOKU_EVENT_PHASE1_START,           /**< Phase 1 elimination started */
-    SUDOKU_EVENT_PHASE1_CELL_SELECTED,   /**< A cell was selected for removal in phase 1 */
-    SUDOKU_EVENT_PHASE1_COMPLETE,        /**< Phase 1 finished */
-    SUDOKU_EVENT_PHASE2_START,           /**< Phase 2 elimination started */
-    SUDOKU_EVENT_PHASE2_ROUND_START,     /**< New phase 2 iteration started */
-    SUDOKU_EVENT_PHASE2_CELL_SELECTED,   /**< A cell was selected for removal in phase 2 */
-    SUDOKU_EVENT_PHASE2_ROUND_COMPLETE,  /**< Phase 2 round finished */
-    SUDOKU_EVENT_PHASE2_COMPLETE,        /**< Phase 2 finished */
-    SUDOKU_EVENT_PHASE3_START,           /**< Phase 3 elimination started */
-    SUDOKU_EVENT_PHASE3_CELL_TESTING,    /**< Testing if a cell can be removed */
-    SUDOKU_EVENT_PHASE3_CELL_REMOVED,    /**< A cell was successfully removed */
-    SUDOKU_EVENT_PHASE3_CELL_KEPT,       /**< A cell must be kept (removal would break uniqueness) */
-    SUDOKU_EVENT_PHASE3_COMPLETE,        /**< Phase 3 finished */
-    SUDOKU_EVENT_GENERATION_COMPLETE,    /**< Entire generation succeeded */
-    SUDOKU_EVENT_GENERATION_FAILED       /**< Generation failed */
+    SUDOKU_EVENT_GENERATION_START,        /**< Generation process started */
+    SUDOKU_EVENT_DIAGONAL_FILL_START,     /**< Filling diagonal subgrids */
+    SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE,  /**< Diagonal filled successfully */
+    SUDOKU_EVENT_BACKTRACK_START,         /**< Backtracking phase started */
+    SUDOKU_EVENT_BACKTRACK_COMPLETE,      /**< Board completion successful */
+    SUDOKU_EVENT_PHASE1_START,            /**< Phase 1 elimination started */
+    SUDOKU_EVENT_PHASE1_CELL_SELECTED,    /**< A cell was selected for removal in phase 1 */
+    SUDOKU_EVENT_PHASE1_COMPLETE,         /**< Phase 1 finished */
+    SUDOKU_EVENT_PHASE2_START,            /**< Phase 2 elimination started */
+    SUDOKU_EVENT_PHASE2_ROUND_START,      /**< New phase 2 iteration started */
+    SUDOKU_EVENT_PHASE2_CELL_SELECTED,    /**< A cell was selected for removal in phase 2 */
+    SUDOKU_EVENT_PHASE2_ROUND_COMPLETE,   /**< Phase 2 round finished */
+    SUDOKU_EVENT_PHASE2_COMPLETE,         /**< Phase 2 finished */
+    SUDOKU_EVENT_PHASE3_START,            /**< Phase 3 elimination started */
+    SUDOKU_EVENT_PHASE3_CELL_TESTING,     /**< Testing if a cell can be removed */
+    SUDOKU_EVENT_PHASE3_CELL_REMOVED,     /**< A cell was successfully removed */
+    SUDOKU_EVENT_PHASE3_CELL_KEPT,        /**< A cell must be kept (removal would break uniqueness) */
+    SUDOKU_EVENT_PHASE3_COMPLETE,         /**< Phase 3 finished */
+    SUDOKU_EVENT_GENERATION_COMPLETE,     /**< Entire generation succeeded */
+    SUDOKU_EVENT_GENERATION_FAILED        /**< Generation failed */
 } SudokuEventType;
 
 /**
@@ -217,19 +296,18 @@ typedef enum {
  * but it's read-only and only valid during the callback execution.
  */
 typedef struct {
-    SudokuEventType type;       /**< Type of event that occurred */
-    const SudokuBoard *board;   /**< Current board state (read-only, temporary) */
+    SudokuEventType type;       ///< Type of event that occurred
+    const SudokuBoard *board;   ///< Current board state (read-only, temporary)
     
-    /* Phase information */
-    int phase_number;           /**< Which elimination phase (1, 2, or 3) */
-    int cells_removed_total;    /**< Total cells removed so far in this phase */
-    int round_number;           /**< Round/iteration number (mainly for phase 2) */
+    // Phase information
+    int phase_number;           ///< Which elimination phase (1, 2, or 3)
+    int cells_removed_total;    ///< Total cells removed so far in this phase
+    int round_number;           ///< Round/iteration number (mainly for phase 2)
     
-    /* Cell-specific information (for cell-related events) */
-    int row;                    /**< Row of the cell in question (-1 if not applicable) */
-    int col;                    /**< Column of the cell in question (-1 if not applicable) */
-    int value;                  /**< Value that was in the cell (0 if not applicable) */
-    
+    // Cell-specific information (for cell-related events)
+    int row;                    ///< Row of the cell (-1 if not applicable)
+    int col;                    ///< Column of the cell (-1 if not applicable)
+    int value;                  ///< Value that was in the cell (0 if not applicable)
 } SudokuEventData;
 
 /**
@@ -265,23 +343,9 @@ typedef void (*SudokuEventCallback)(const SudokuEventData *event, void *user_dat
  * a callback to monitor progress.
  */
 typedef struct {
-    SudokuEventCallback callback;  /**< Optional callback function (can be NULL) */
-    void *user_data;               /**< Custom data passed to callback (can be NULL) */
-    int max_attempts;              /**< Maximum generation attempts (0 = unlimited) */
+    SudokuEventCallback callback;  ///< Optional callback function (can be NULL)
+    void *user_data;               ///< Custom data passed to callback (can be NULL)
+    int max_attempts;
 } SudokuGenerationConfig;
 
-/* ═══════════════════════════════════════════════════════════════
- * NOTES ON EXCLUDED TYPES
- * ═══════════════════════════════════════════════════════════════ 
- * 
- * The following types were defined in the original main.c but are
- * not included here because they are not currently used:
- * 
- * - SolutionBoard: Intended for future interactive mode
- * - PlayerBoard: Intended for future interactive mode
- * 
- * These will be added when implementing the interactive/solver
- * modules where they will actually be needed.
- */
-
-#endif /* SUDOKU_CORE_TYPES_H */
+#endif // SUDOKU_TYPES_H
