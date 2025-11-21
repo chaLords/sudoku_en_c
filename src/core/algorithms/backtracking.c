@@ -7,6 +7,8 @@
  * This module implements the backtracking algorithm used to complete a
  * partially filled Sudoku board. The algorithm uses recursive exploration
  * with intelligent pruning to efficiently find a valid complete board.
+ * 
+ * Version 2.3.0: Adapted for configurable board sizes (4×4, 9×9, 16×16, 25×25)
  */
 
 #include "../internal/generator_internal.h"
@@ -64,7 +66,7 @@ static void shuffle_numbers(int *array, int size) {
  * 
  * The algorithm uses systematic exploration with backtracking:
  * - Find an empty cell (if none exist, we're done - success!)
- * - Try placing each number 1-9 in random order
+ * - Try placing each number from 1 to board_size in random order
  * - For each valid number, recursively try to complete the rest
  * - If recursion succeeds, propagate success up the call stack
  * - If recursion fails, backtrack by removing the number and trying the next
@@ -73,22 +75,31 @@ static void shuffle_numbers(int *array, int size) {
  * The randomization of number order ensures variety in generated boards.
  * Without shuffling, the algorithm would be deterministic and always produce
  * identical boards for the same starting configuration.
+ * 
+ * CONFIGURABLE SIZE ADAPTATION:
+ * This function now works with boards of any valid size (4×4, 9×9, 16×16, etc.)
+ * by allocating the numbers array dynamically based on board->board_size.
+ * This requires careful memory management to avoid leaks in the recursive calls.
  *
  * @param board Pointer to the board to complete (WILL BE MODIFIED IN PLACE)
  * @return true if the board was successfully completed
- * @return false if no valid completion exists
+ * @return false if no valid completion exists or memory allocation fails
  * 
  * @pre board != NULL
+ * @pre board->board_size > 0
  * @post If returns true, board contains a valid complete Sudoku
  * @post If returns false, board is in an indeterminate partial state
  * 
  * @warning Recursive function - uses stack space proportional to empty cells
- * @note Maximum recursion depth is bounded by number of empty cells (< 81)
+ * @warning Each recursive call allocates board_size integers on the heap
+ * @note Maximum recursion depth bounded by number of empty cells (< board_size²)
  * @note Excellent average performance due to early pruning via validation
+ * @note Memory usage: O(depth × board_size) where depth is recursion level
  */
 bool sudoku_complete_backtracking(SudokuBoard *board) {
     // Precondition validation: ensure we received a valid board pointer
     assert(board != NULL);
+    assert(board->board_size > 0);
     
     // Declare a position structure to store coordinates of empty cell
     SudokuPosition pos;
@@ -101,24 +112,42 @@ bool sudoku_complete_backtracking(SudokuBoard *board) {
     
     // RECURSIVE CASE: We found an empty cell that needs to be filled
     
-    // Create an array with numbers 1 through 9
-    int numbers[SUDOKU_SIZE];
-    for(int i = 0; i < SUDOKU_SIZE; i++) {
+    // ✅ CHANGE 1: Dynamic allocation based on actual board size
+    // Instead of a fixed-size array, we allocate exactly what we need
+    // For a 4×4 board: allocate 4 ints (16 bytes)
+    // For a 9×9 board: allocate 9 ints (36 bytes)
+    // For a 16×16 board: allocate 16 ints (64 bytes)
+    int *numbers = malloc(board->board_size * sizeof(int));
+    
+    // Critical error handling: if malloc fails, we cannot continue
+    // This is rare but must be handled to prevent undefined behavior
+    if(numbers == NULL) {
+        // Memory allocation failed - return false to indicate failure
+        // The board state is unchanged, so this is safe
+        return false;
+    }
+    
+    // ✅ CHANGE 2: Fill array with numbers 1 to board_size (not hardcoded to 9)
+    // For 4×4: [1, 2, 3, 4]
+    // For 9×9: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    // For 16×16: [1, 2, 3, ..., 16]
+    for(int i = 0; i < board->board_size; i++) {
         numbers[i] = i + 1;
     }
     
     // Shuffle the numbers to create variety in generated boards
     // Without this, we'd always try numbers in the same order (1,2,3...)
     // which would produce identical boards every time
-    shuffle_numbers(numbers, SUDOKU_SIZE);
+    shuffle_numbers(numbers, board->board_size);
     
-    // Try each number in our randomized order
-    for(int i = 0; i < SUDOKU_SIZE; i++) {
+    // ✅ CHANGE 3: Iterate up to board_size (not hardcoded SUDOKU_SIZE)
+    // This ensures we try all possible numbers for this board size
+    for(int i = 0; i < board->board_size; i++) {
         int num = numbers[i];
         
         // PRUNING: Check if this number violates any Sudoku rules
-        // This validation dramatically reduces the search space by
-        // immediately eliminating invalid choices
+        // The validation functions have already been adapted to work with
+        // any board size, so this just works transparently
         if(sudoku_is_safe_position(board, &pos, num)) {
             // The number is valid! Place it tentatively in the cell
             board->cells[pos.row][pos.col] = num;
@@ -127,6 +156,10 @@ bool sudoku_complete_backtracking(SudokuBoard *board) {
             // number in place. If the recursion returns true, we found
             // a complete valid solution!
             if(sudoku_complete_backtracking(board)) {
+                // ✅ CRITICAL: Free memory before returning success
+                // This is essential to prevent memory leaks
+                // Every malloc must have a corresponding free
+                free(numbers);
                 return true;  // Success! Let the recursion unwind
             }
             
@@ -142,8 +175,14 @@ bool sudoku_complete_backtracking(SudokuBoard *board) {
         // This is implicit pruning - we never attempt invalid placements
     }
     
-    // FAILURE CASE: We tried all nine numbers and none led to success
+    // FAILURE CASE: We tried all numbers and none led to success
     // This means the current board state has no valid completion
+    
+    // ✅ CRITICAL: Free memory before returning failure
+    // Even in failure cases, we must free allocated memory
+    // This ensures no leaks occur during backtracking
+    free(numbers);
+    
     // Return false to trigger backtracking in our caller
     // Note: In our hybrid generator this is extremely rare because we
     // start with valid diagonal subgrids, but we handle it correctly
