@@ -131,8 +131,11 @@ bool sudoku_generate_ex(SudokuBoard *board,
     // ═══════════════════════════════════════════════════════════════
     // PHASE 3: Free elimination with uniqueness verification
     // ═══════════════════════════════════════════════════════════════
-    
-    int removed3 = phase3Elimination(board, PHASE3_TARGET);
+    // Phase 3: Free elimination with automatic target calculation
+    // The target is calculated proportionally based on board size to maintain
+    // consistent difficulty across 4×4, 9×9, 16×16, and 25×25 boards.
+    // For 9×9 boards, this produces the same result as the old PHASE3_TARGET (25).
+    int removed3 = phase3EliminationAuto(board);
     
     if (stats) {
         stats->phase3_removed = removed3;

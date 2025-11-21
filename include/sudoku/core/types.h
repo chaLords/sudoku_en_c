@@ -46,22 +46,15 @@
 //                    GENERATION PARAMETERS
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * @brief Target number of cells to remove in Phase 3
- * 
- * Phase 3 of the generation algorithm attempts to remove up to
- * this many additional cells while maintaining a unique solution.
- * 
- * @deprecated This constant is hardcoded for 9×9 boards and will be
- *             replaced with a dynamic calculation in Phase 3 refactoring.
- *             For configurable sizes, Phase 3 should remove approximately
- *             30% of total_cells instead of a fixed value.
- * 
- * TODO (Phase 3): Replace with dynamic calculation:
- *       phase3_target = (board->total_cells * 3) / 10;  // 30% of cells
- */
-#define PHASE3_TARGET 25
-
+// REMOVED: PHASE3_TARGET constant no longer used (v3.0+)
+// The target for Phase 3 elimination is now calculated dynamically
+// based on board size using calculate_phase3_target() in phase3.c.
+// For 9×9 boards, this produces the same result (25 cells ≈ 31%),
+// but now scales correctly for 4×4, 16×16, and 25×25 boards.
+// See phase3.c:calculate_phase3_target() for implementation details.
+//
+// Previous definition (kept for historical reference):
+// #define PHASE3_TARGET 25
 // ═══════════════════════════════════════════════════════════════════
 //                    BACKWARD COMPATIBILITY (Deprecated)
 // ═══════════════════════════════════════════════════════════════════
