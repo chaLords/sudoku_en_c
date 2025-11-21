@@ -7,6 +7,11 @@
  * This header contains private functions for board manipulation that are
  * used internally by the generator and solver algorithms. These functions
  * are not part of the public API and should not be used by external code.
+ * 
+ * PHASE 2A REFACTORING:
+ * - Transformed SudokuBoard from static arrays to dynamic memory allocation
+ * - Added dimension tracking fields (subgrid_size, board_size, total_cells)
+ * - This enables true multi-size board support (4×4, 9×9, 16×16, 25×25)
  */
 
 #ifndef SUDOKU_BOARD_INTERNAL_H
@@ -38,10 +43,11 @@
  * @post The board structure is never modified by this function
  * 
  * @note This is an internal function - not part of the public API
- * @note Time complexity: O(n²) where n = SUDOKU_SIZE, but typically terminates early
+ * @note Time complexity: O(n²) where n = board_size, but typically terminates early
  * @note Space complexity: O(1) - no additional memory allocation
  */
 bool sudoku_find_empty_cell(const SudokuBoard *board, SudokuPosition *pos);
+
 // Funciones de llenado de tablero (internas)
 void fillSubGrid(SudokuBoard *board, const SudokuSubGrid *sg);
 void fillDiagonal(SudokuBoard *board);
@@ -52,26 +58,149 @@ void sudoku_board_update_stats(SudokuBoard *board);
 /**
  * @brief Complete internal definition of SudokuBoard
  * 
- * This structure contains the actual implementation of the board.
- * Client code cannot see this definition - they only work with
- * SudokuBoard* pointers through the public API.
+ * PHASE 2A: DYNAMIC MEMORY ARCHITECTURE
+ * =======================================
  * 
- * This separation allows us to change the internal representation
- * in the future without breaking client code.
+ * This structure now supports configurable board sizes through dynamic
+ * memory allocation. The key changes from v2.2.x:
  * 
- * Current layout (v2.2.x compatible):
- * - cells: 9x9 array of integers (0 = empty, 1-9 = filled)
- * - clues: cached count of filled cells
- * - empty: cached count of empty cells
+ * BEFORE (v2.2.x - Static Array):
+ *   int cells[SUDOKU_SIZE][SUDOKU_SIZE];  // Fixed 9×9, 324 bytes
  * 
- * Future considerations (v3.0):
- * - Variable size boards: int size; int *cells;
- * - Validity caching: bool is_valid; bool validity_cached;
- * - Solution storage: int *solution;
+ * AFTER (v3.0 - Dynamic Array):
+ *   int **cells;                            // Pointer to pointer
+ *   int subgrid_size;                       // Size of subgrids (2-5)
+ *   int board_size;                         // Full board size (4-25)
+ *   int total_cells;                        // Total cells in board
+ * 
+ * MEMORY LAYOUT EXAMPLE (4×4 board):
+ * ===================================
+ * 
+ * board->cells → [ptr0] → [1][2][3][4]  ← Row 0
+ *                [ptr1] → [5][6][7][8]  ← Row 1
+ *                [ptr2] → [9][0][0][0]  ← Row 2
+ *                [ptr3] → [0][0][0][0]  ← Row 3
+ * 
+ * ALLOCATION STRATEGY:
+ * ====================
+ * 1. Allocate array of row pointers: malloc(board_size * sizeof(int*))
+ * 2. For each row, allocate column array: malloc(board_size * sizeof(int))
+ * 
+ * DEALLOCATION STRATEGY:
+ * ======================
+ * 1. Free each row individually: free(cells[i]) for i in [0, board_size)
+ * 2. Free the row pointer array: free(cells)
+ * 
+ * CLIENT CODE COMPATIBILITY:
+ * ==========================
+ * The syntax board->cells[row][col] remains IDENTICAL to static arrays.
+ * This is the beauty of C's pointer arithmetic - the [][] operator works
+ * seamlessly with both static and dynamic 2D arrays.
+ * 
+ * WHY DYNAMIC ALLOCATION?
+ * =======================
+ * 1. Flexibility: Support any valid Sudoku size at runtime
+ * 2. Memory efficiency: Only allocate what's needed
+ * 3. Scalability: Can handle very large boards (25×25 = 625 cells)
+ * 4. Professional practice: Standard approach for variable-size data
+ * 
+ * EDUCATIONAL NOTE:
+ * =================
+ * This transformation from static to dynamic arrays is a fundamental
+ * skill in systems programming. The key insight is that int** creates
+ * a "pointer to pointer" structure that mimics 2D array syntax while
+ * allowing runtime size determination.
  */
 struct SudokuBoard {
-    int cells[SUDOKU_SIZE][SUDOKU_SIZE];    /**< The 9x9 grid of cell values */
-    int clues;                               /**< Number of filled cells (non-zero) */
-    int empty;                               /**< Number of empty cells (zero) */
+    // ═══════════════════════════════════════════════════════════
+    //  DYNAMIC MEMORY: The 2D Cell Grid
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * @brief Dynamic 2D array of cell values
+     * 
+     * This is allocated as an array of pointers, where each pointer
+     * points to a row of integers. Access syntax remains identical
+     * to static arrays: cells[row][col]
+     * 
+     * Memory ownership: This structure owns this memory and is
+     * responsible for freeing it in sudoku_board_destroy()
+     * 
+     * Valid values: 0 (empty) or 1 to board_size (filled)
+     */
+    int **cells;
+    
+    // ═══════════════════════════════════════════════════════════
+    //  DIMENSION TRACKING: Board Geometry
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * @brief Size of each subgrid (2, 3, 4, or 5)
+     * 
+     * Examples:
+     * - subgrid_size = 2 → 2×2 subgrids in 4×4 board
+     * - subgrid_size = 3 → 3×3 subgrids in 9×9 board (classic)
+     * - subgrid_size = 4 → 4×4 subgrids in 16×16 board
+     * - subgrid_size = 5 → 5×5 subgrids in 25×25 board
+     */
+    int subgrid_size;
+    
+    /**
+     * @brief Full size of the board (subgrid_size²)
+     * 
+     * This is the number of rows and columns in the board.
+     * 
+     * Formula: board_size = subgrid_size × subgrid_size
+     * 
+     * Examples:
+     * - subgrid_size = 2 → board_size = 4
+     * - subgrid_size = 3 → board_size = 9
+     * - subgrid_size = 4 → board_size = 16
+     */
+    int board_size;
+    
+    /**
+     * @brief Total number of cells in the board (board_size²)
+     * 
+     * This is a cached value for performance - we could always
+     * compute it as board_size * board_size, but storing it
+     * avoids repeated multiplication in hot paths.
+     * 
+     * Formula: total_cells = board_size × board_size
+     * 
+     * Examples:
+     * - board_size = 4 → total_cells = 16
+     * - board_size = 9 → total_cells = 81
+     * - board_size = 16 → total_cells = 256
+     * 
+     * Invariant: clues + empty = total_cells (always)
+     */
+    int total_cells;
+    
+    // ═══════════════════════════════════════════════════════════
+    //  STATISTICS: Cell Counts (Cached for Performance)
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * @brief Number of filled cells (non-zero values)
+     * 
+     * This is updated by sudoku_board_update_stats() and represents
+     * the count of cells containing values from 1 to board_size.
+     * 
+     * Valid range: [0, total_cells]
+     */
+    int clues;
+    
+    /**
+     * @brief Number of empty cells (zero values)
+     * 
+     * This is the complement of clues. It represents the count of
+     * cells that still need to be filled.
+     * 
+     * Valid range: [0, total_cells]
+     * Invariant: empty = total_cells - clues
+     */
+    int empty;
 };
+
 #endif // SUDOKU_BOARD_INTERNAL_H

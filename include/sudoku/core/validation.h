@@ -88,6 +88,9 @@ bool sudoku_is_safe_position(const SudokuBoard *board,
  * 
  * @see sudoku_is_safe_position() for single position checking
  */
+
+bool sudoku_find_empty_cell(const SudokuBoard *board, SudokuPosition *pos);
+
 bool sudoku_validate_board(const SudokuBoard *board);
 
 // ═══════════════════════════════════════════════════════════════════

@@ -1,445 +1,373 @@
 /**
- * @file board.c 
- * @brief Implementation of Sudoku board operations with configurable sizes
+ * @file board.c
+ * @brief Implementation of Sudoku board operations with dynamic memory
  * @author Gonzalo Ramírez
  * @date 2025-11-18
  * 
- * This module provides the foundational layer for all Sudoku board operations.
- * Now supports configurable board sizes through dynamic memory allocation.
+ * PHASE 2A REFACTORING: DYNAMIC MEMORY ARCHITECTURE
+ * ==================================================
  * 
- * BREAKING CHANGES from v2.2.x:
- * - SudokuBoard structure changed from static to dynamic allocation
- * - cells array is now int** instead of int[9][9]
- * - Stack allocation no longer supported - must use sudoku_board_create()
- * - Board dimensions are now runtime-configurable
+ * This module now implements fully dynamic memory allocation for boards,
+ * enabling support for multiple board sizes (4×4, 9×9, 16×16, 25×25).
+ * 
+ * KEY CHANGES FROM v2.2.x:
+ * - Replaced static int cells[9][9] with dynamic int **cells
+ * - Added dimension tracking (subgrid_size, board_size, total_cells)
+ * - Implemented proper memory allocation and deallocation patterns
+ * - Maintained identical API surface for backward compatibility
+ * 
+ * CRITICAL MEMORY MANAGEMENT RULES:
+ * - Every sudoku_board_create*() MUST pair with sudoku_board_destroy()
+ * - Deallocation must happen in REVERSE order of allocation
+ * - Always check malloc() return values for NULL (allocation failure)
  */
 
-#include <stdlib.h>                         // For malloc(), calloc(), free()
-#include <stdio.h>                          // For fprintf()
-#include <assert.h>                         // For assert()
-#include "sudoku/core/board.h"              // Our public header
-#include "sudoku/core/types.h"              // For structure definitions
-#include "internal/board_internal.h"        // For internal function declarations
-#include "internal/algorithms_internal.h"   // For sudoku_generate_permutation()
+#include "sudoku/core/board.h"
+#include "internal/board_internal.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PRIVATE: MEMORY ALLOCATION HELPERS
+//                    MEMORY MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Allocate a 2D integer array dynamically
+ * @brief Allocate the 2D dynamic array for cells
  * 
- * Creates a 2D array using pointer-to-pointer technique. First allocates
- * an array of row pointers, then allocates each row. Uses calloc() for
- * rows to initialize all cells to zero automatically.
+ * This helper function encapsulates the two-step allocation process
+ * required for dynamic 2D arrays in C:
  * 
- * Memory layout:
- * @code
- *   array → [ptr0] → [0][0][0]...[0]  (row 0)
- *           [ptr1] → [0][0][0]...[0]  (row 1)
- *           [ptr2] → [0][0][0]...[0]  (row 2)
- *           ...
- * @endcode
+ * Step 1: Allocate array of row pointers
+ * Step 2: For each row, allocate array of column values
  * 
- * @param[in] rows Number of rows to allocate
- * @param[in] cols Number of columns per row
- * @return Pointer to allocated 2D array, or NULL on allocation failure
+ * MEMORY LAYOUT CREATED:
  * 
- * @note Uses calloc() for rows → cells are initialized to 0
- * @note On failure, frees any partially allocated memory before returning NULL
- * @note Caller must free with free_2d_array()
+ * board->cells → [ptr_row0] → [cell][cell][cell]...[cell]
+ *                [ptr_row1] → [cell][cell][cell]...[cell]
+ *                [ptr_row2] → [cell][cell][cell]...[cell]
+ *                ...
+ *                [ptr_rowN] → [cell][cell][cell]...[cell]
  * 
- * Example:
- * @code
- * int **cells = allocate_2d_array(9, 9);
- * if (cells != NULL) {
- *     cells[0][0] = 5;  // Access like normal 2D array
- *     free_2d_array(cells, 9);
- * }
- * @endcode
+ * WHY TWO STEPS?
+ * Because C doesn't support variable-length 2D arrays natively. The
+ * pointer-to-pointer approach gives us the same [][] syntax while
+ * allowing runtime size determination.
  * 
- * @internal This is a private helper, not exposed in public API
+ * @param board Board structure to allocate cells for
+ * @param size Dimension of the board (both rows and columns)
+ * @return true if allocation succeeded, false if malloc failed
+ * 
+ * @note On failure, no partial allocations remain (cleanup is performed)
+ * @note Time complexity: O(n) where n = size
+ * @note Memory allocated: size * sizeof(int*) + size * size * sizeof(int)
  */
-static int** allocate_2d_array(int rows, int cols) {
-    // Allocate array of row pointers
-    int **array = (int**)malloc(rows * sizeof(int*));
-    if (array == NULL) {
-        fprintf(stderr, "Error: Failed to allocate row pointers (%d rows)\n", rows);
-        return NULL;
+static bool allocate_cells(SudokuBoard *board, int size) {
+    // STEP 1: Allocate array of row pointers
+    // This creates space for 'size' pointers, each will point to a row
+    board->cells = (int**)malloc(size * sizeof(int*));
+    if (board->cells == NULL) {
+        // Allocation failed - probably out of memory
+        return false;
     }
     
-    // Allocate each row
-    for (int i = 0; i < rows; i++) {
-        // Using calloc() to initialize cells to 0 automatically
-        array[i] = (int*)calloc(cols, sizeof(int));
-        
-        if (array[i] == NULL) {
-            // Allocation failed - clean up what we've allocated so far
-            fprintf(stderr, "Error: Failed to allocate row %d of %d\n", i, rows);
+    // STEP 2: Allocate each individual row
+    // Each row is an array of 'size' integers
+    for (int i = 0; i < size; i++) {
+        board->cells[i] = (int*)malloc(size * sizeof(int));
+        if (board->cells[i] == NULL) {
+            // Allocation failed for this row
+            // CRITICAL: We must clean up the rows we already allocated
+            // to avoid memory leaks
             
             // Free all previously allocated rows
             for (int j = 0; j < i; j++) {
-                free(array[j]);
+                free(board->cells[j]);
             }
             
             // Free the row pointer array
-            free(array);
+            free(board->cells);
+            board->cells = NULL;
             
-            return NULL;
+            return false;
         }
     }
     
-    return array;
+    // Success! All rows allocated successfully
+    return true;
 }
 
 /**
- * @brief Free a 2D integer array
+ * @brief Free the 2D dynamic array of cells
  * 
- * Releases all memory associated with a 2D array allocated by
- * allocate_2d_array(). First frees each row, then frees the
- * array of row pointers.
+ * This function performs the inverse operation of allocate_cells().
+ * It's CRITICAL that we free in the reverse order of allocation:
  * 
- * @param[in] array Pointer to 2D array to free (can be NULL)
- * @param[in] rows Number of rows in the array
+ * 1. Free each row (the arrays pointed to by row pointers)
+ * 2. Free the array of row pointers itself
  * 
- * @note Safe to call with NULL array (does nothing)
- * @note rows must match the value used in allocate_2d_array()
+ * WHY THIS ORDER?
+ * If we freed board->cells first, we'd lose the pointers to the
+ * individual rows, making them unreachable and causing memory leaks.
  * 
- * Example:
- * @code
- * int **cells = allocate_2d_array(9, 9);
- * // ... use cells ...
- * free_2d_array(cells, 9);
- * @endcode
+ * MEMORY LEAK SCENARIO (WRONG ORDER):
  * 
- * @internal This is a private helper, not exposed in public API
+ * free(board->cells);     // ← Lose row pointers!
+ * // Now cells[0], cells[1], ... are orphaned in memory
+ * // We have no way to free them → MEMORY LEAK
+ * 
+ * CORRECT ORDER (THIS FUNCTION):
+ * 
+ * for each row: free(cells[i]);  // ← Free each row
+ * free(board->cells);             // ← Then free pointer array
+ * 
+ * @param board Board whose cells should be freed
+ * 
+ * @note Safe to call even if cells is NULL (does nothing)
+ * @note After this call, board->cells is set to NULL for safety
  */
-static void free_2d_array(int **array, int rows) {
-    if (array == NULL) {
+static void free_cells(SudokuBoard *board) {
+    if (board->cells == NULL) {
         return;  // Nothing to free
     }
     
-    // Free each row
-    for (int i = 0; i < rows; i++) {
-        free(array[i]);
+    // Free each row individually
+    // IMPORTANT: We use board->board_size, not a hardcoded value
+    for (int i = 0; i < board->board_size; i++) {
+        free(board->cells[i]);
     }
     
     // Free the array of row pointers
-    free(array);
+    free(board->cells);
+    
+    // Set to NULL to avoid double-free or use-after-free bugs
+    board->cells = NULL;
 }
-
-// ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: MEMORY MANAGEMENT
-// ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Create a Sudoku board with specific subgrid size
  * 
- * Allocates and initializes a new board with configurable dimensions.
- * This is the primary way to create boards of different sizes.
+ * This is the primary constructor for SudokuBoard. It allocates all
+ * necessary memory and initializes the structure to represent an empty
+ * board of the requested size.
  * 
- * The function performs the following steps:
- * 1. Validates the subgrid size (must be 2-5)
- * 2. Allocates the SudokuBoard structure
- * 3. Calculates derived dimensions (board_size, total_cells)
- * 4. Allocates the 2D cells array
- * 5. Initializes all cells to 0 and sets metadata
+ * ALLOCATION PERFORMED:
+ * 1. SudokuBoard structure itself: sizeof(SudokuBoard)
+ * 2. Array of row pointers: board_size * sizeof(int*)
+ * 3. Each row array: board_size * sizeof(int), repeated board_size times
  * 
- * @param[in] subgrid_size Size of subgrids (valid: 2, 3, 4, 5)
+ * TOTAL MEMORY: sizeof(SudokuBoard) + board_size * sizeof(int*) + 
+ *               board_size² * sizeof(int)
+ * 
+ * Examples:
+ * - 4×4 board: ~88 bytes (struct) + 16 bytes (ptrs) + 64 bytes (cells) = ~168 bytes
+ * - 9×9 board: ~88 bytes + 36 bytes + 324 bytes = ~448 bytes
+ * - 16×16 board: ~88 bytes + 64 bytes + 1024 bytes = ~1176 bytes
+ * 
+ * @param subgrid_size Size of subgrids (valid: 2, 3, 4, 5)
  * @return Pointer to newly created board, or NULL on error
  * 
- * @note Returns NULL if:
- *       - subgrid_size is out of range (< 2 or > 5)
- *       - Memory allocation fails
- * @note Caller must free with sudoku_board_destroy()
- * @note All cells are initialized to 0 (empty)
+ * @post If successful, returned board is fully initialized and empty
+ * @post If failed (returns NULL), no memory leaks occur
  * 
- * Memory requirements:
- * - 2×2 (4×4):   ~120 bytes
- * - 3×3 (9×9):   ~400 bytes
- * - 4×4 (16×16): ~1.3 KB
- * - 5×5 (25×25): ~3.2 KB
- * 
- * Performance:
- * - Allocation is O(n²) where n = board_size
- * - Typically takes < 1ms even for 25×25 boards
- * 
- * Example:
- * @code
- * // Create a 16×16 Sudoku board (4×4 subgrids)
- * SudokuBoard *board = sudoku_board_create_size(4);
- * if (board == NULL) {
- *     fprintf(stderr, "Failed to create board\n");
- *     return 1;
- * }
- * 
- * printf("Created %d×%d board with %d cells\n",
- *        board->board_size, board->board_size, board->total_cells);
- * 
- * // Use board...
- * sudoku_board_destroy(board);
- * @endcode
- * 
- * @see sudoku_board_create() for default 9×9 board
- * @see sudoku_board_destroy() to free memory
+ * @note Caller MUST call sudoku_board_destroy() when done
+ * @note Returns NULL if subgrid_size is invalid or allocation fails
  */
 SudokuBoard* sudoku_board_create_size(int subgrid_size) {
-    // ─────────────────────────────────────────────────────────────
-    //  Step 1: Validate subgrid size
-    // ─────────────────────────────────────────────────────────────
-    
+    // VALIDATION: Check for valid subgrid size
+    // Valid Sudoku sizes: 2 (4×4), 3 (9×9), 4 (16×16), 5 (25×25)
+    // Larger sizes are theoretically valid but computationally expensive
     if (subgrid_size < 2 || subgrid_size > 5) {
-        fprintf(stderr, "Error: Invalid subgrid size %d (must be 2-5)\n", subgrid_size);
-        fprintf(stderr, "       Valid sizes:\n");
-        fprintf(stderr, "       - 2: Creates 4×4 board (16 cells)\n");
-        fprintf(stderr, "       - 3: Creates 9×9 board (81 cells) [classic]\n");
-        fprintf(stderr, "       - 4: Creates 16×16 board (256 cells)\n");
-        fprintf(stderr, "       - 5: Creates 25×25 board (625 cells)\n");
+        fprintf(stderr, "Error: Invalid subgrid size %d (valid: 2-5)\n", 
+                subgrid_size);
         return NULL;
     }
     
-    // ─────────────────────────────────────────────────────────────
-    //  Step 2: Allocate board structure
-    // ─────────────────────────────────────────────────────────────
-    
+    // STEP 1: Allocate the board structure itself
     SudokuBoard *board = (SudokuBoard*)malloc(sizeof(SudokuBoard));
     if (board == NULL) {
         fprintf(stderr, "Error: Failed to allocate SudokuBoard structure\n");
         return NULL;
     }
     
-    // ─────────────────────────────────────────────────────────────
-    //  Step 3: Calculate and store dimensions
-    // ─────────────────────────────────────────────────────────────
-    
+    // STEP 2: Calculate and store dimensions
+    // These calculations define the board geometry
     board->subgrid_size = subgrid_size;
     board->board_size = subgrid_size * subgrid_size;
     board->total_cells = board->board_size * board->board_size;
     
-    // ─────────────────────────────────────────────────────────────
-    //  Step 4: Allocate cells array
-    // ─────────────────────────────────────────────────────────────
-    
-    board->cells = allocate_2d_array(board->board_size, board->board_size);
-    if (board->cells == NULL) {
-        fprintf(stderr, "Error: Failed to allocate %d×%d cells array\n",
+    // STEP 3: Allocate the dynamic 2D array for cells
+    if (!allocate_cells(board, board->board_size)) {
+        // Allocation failed - free the board structure and return NULL
+        fprintf(stderr, "Error: Failed to allocate cells array for %dx%d board\n",
                 board->board_size, board->board_size);
-        free(board);  // Clean up the board structure
+        free(board);
         return NULL;
     }
     
-    // ─────────────────────────────────────────────────────────────
-    //  Step 5: Initialize metadata
-    // ─────────────────────────────────────────────────────────────
+    // STEP 4: Initialize the board to empty state
+    // This sets all cells to 0 and updates statistics
+    sudoku_board_init(board);
     
-    // Cells are already 0 (calloc in allocate_2d_array)
-    board->clues = 0;
-    board->empty = board->total_cells;
-    
+    // Success! Return the fully initialized board
     return board;
 }
 
 /**
  * @brief Create a board with default size (9×9)
  * 
- * Convenience wrapper for creating a classic 9×9 Sudoku board.
- * This maintains backward compatibility with code that expects
- * the standard board size.
+ * Convenience wrapper for the classic 9×9 Sudoku. This maintains
+ * backward compatibility with code that doesn't need configurable sizes.
  * 
- * Equivalent to: sudoku_board_create_size(3)
+ * Implementation is trivial: just delegates to sudoku_board_create_size(3)
  * 
  * @return Pointer to newly created 9×9 board, or NULL on error
- * 
- * @note Caller must free with sudoku_board_destroy()
- * @note This is the recommended way to create a standard Sudoku board
- * 
- * Example:
- * @code
- * // Create classic 9×9 board
- * SudokuBoard *board = sudoku_board_create();
- * if (board != NULL) {
- *     // Board is ready to use
- *     sudoku_board_destroy(board);
- * }
- * @endcode
- * 
- * @see sudoku_board_create_size() for non-standard sizes
  */
 SudokuBoard* sudoku_board_create(void) {
-    return sudoku_board_create_size(SUDOKU_DEFAULT_SUBGRID_SIZE);
+    return sudoku_board_create_size(3);  // 3×3 subgrids → 9×9 board
 }
 
 /**
- * @brief Destroy a Sudoku board and free its memory
+ * @brief Destroy a Sudoku board and free all associated memory
  * 
- * Releases all memory associated with a dynamically allocated board:
- * 1. Frees the 2D cells array (each row, then the row pointer array)
- * 2. Frees the board structure itself
+ * This is the destructor for SudokuBoard. It releases ALL memory
+ * associated with the board, including the 2D cells array and the
+ * board structure itself.
  * 
- * After calling this function, the board pointer is no longer valid
- * and must not be dereferenced.
+ * DEALLOCATION ORDER:
+ * 1. Free each row of cells: free(cells[i])
+ * 2. Free array of row pointers: free(cells)
+ * 3. Free board structure: free(board)
  * 
- * @param[in] board Pointer to board to destroy (can be NULL)
+ * This order is CRITICAL - we must free inner structures before
+ * outer structures to avoid memory leaks.
  * 
- * @post If board was not NULL, all its memory is freed
- * @post Board pointer is no longer valid
+ * @param board Pointer to board to destroy (can be NULL)
  * 
- * @note Safe to call with NULL (does nothing, like standard free())
- * @note Do NOT call on stack-allocated boards (only heap-allocated)
- * @note After calling, set pointer to NULL to avoid use-after-free
+ * @post All memory associated with board is freed
+ * @post board pointer is invalid after this call (caller should set to NULL)
  * 
- * Example:
- * @code
- * SudokuBoard *board = sudoku_board_create();
- * // ... use board ...
- * sudoku_board_destroy(board);
- * board = NULL;  // Good practice: prevent use-after-free
- * @endcode
- * 
- * @see sudoku_board_create() and sudoku_board_create_size()
+ * @note Safe to call with NULL pointer (does nothing)
+ * @note DO NOT call on stack-allocated boards (only heap-allocated)
+ * @note After calling, the pointer is dangling - set it to NULL in caller
  */
 void sudoku_board_destroy(SudokuBoard *board) {
     if (board == NULL) {
-        return;  // Nothing to free
+        return;  // Nothing to destroy
     }
     
-    // Free the 2D cells array
-    free_2d_array(board->cells, board->board_size);
+    // Free the 2D cells array (handles NULL gracefully)
+    free_cells(board);
     
     // Free the board structure itself
     free(board);
+    
+    // Note: We don't set board to NULL here because we can't modify
+    // the caller's pointer. The caller should do: 
+    // sudoku_board_destroy(board); board = NULL;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: BOARD INITIALIZATION
+//                    BOARD INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Initialize a board to completely empty state
+ * @brief Initialize a board to empty state (all cells = 0)
  * 
- * Sets all cells to zero (representing empty cells) and resets
- * metadata counters. This is automatically called by
- * sudoku_board_create_size(), but can be called manually to
- * reset an existing board.
+ * This function resets the board to a clean empty state. It's called
+ * automatically by sudoku_board_create_size(), but can also be called
+ * manually to reset an existing board.
  * 
- * The function now uses the board's dynamic board_size instead
- * of a hardcoded constant, making it work for any board size.
+ * OPERATIONS PERFORMED:
+ * 1. Set all cells to 0 (empty)
+ * 2. Set clues = 0 (no filled cells)
+ * 3. Set empty = total_cells (all cells empty)
  * 
- * @param[out] board Pointer to the board structure to initialize
+ * @param board Pointer to board to initialize
  * 
  * @pre board != NULL
  * @pre board->cells != NULL (memory must be allocated)
- * @post All cells contain 0 (empty)
+ * @post All cells contain 0
  * @post board->clues == 0
  * @post board->empty == board->total_cells
  * 
- * @note This function has no return value - initialization cannot fail
  * @note Time complexity: O(n²) where n = board_size
- * 
- * Example:
- * @code
- * SudokuBoard *board = sudoku_board_create();
- * // ... use board ...
- * sudoku_board_init(board);  // Reset to empty state
- * // Board is now ready for new generation
- * @endcode
  */
 void sudoku_board_init(SudokuBoard *board) {
-    // Zero out all cells using dynamic board size
-    for(int i = 0; i < board->board_size; i++) {
-        for(int j = 0; j < board->board_size; j++) {
+    assert(board != NULL);
+    assert(board->cells != NULL);
+    
+    // Zero out all cells
+    // NOTE: We use board->board_size, NOT a hardcoded constant
+    for (int i = 0; i < board->board_size; i++) {
+        for (int j = 0; j < board->board_size; j++) {
             board->cells[i][j] = 0;
         }
     }
     
-    // Initialize metadata to reflect empty board state
+    // Update statistics to reflect empty board
     board->clues = 0;
     board->empty = board->total_cells;
 }
 
 /**
- * @brief Recalculate and update board statistics
+ * @brief Recalculate board statistics by scanning all cells
  * 
- * Scans the entire board to count filled and empty cells, updating
- * the board's metadata fields. This should be called after any series
- * of cell modifications to ensure statistics remain accurate.
+ * This function performs a complete scan of the board to count filled
+ * and empty cells, updating the clues and empty fields. Call this after
+ * manually modifying cells to ensure statistics remain accurate.
  * 
- * The function now uses the board's dynamic board_size instead
- * of a hardcoded constant.
+ * ALGORITHM:
+ * 1. Initialize counter to 0
+ * 2. Scan every cell in the board
+ * 3. Increment counter for each non-zero cell
+ * 4. Set clues = counter
+ * 5. Set empty = total_cells - counter
  * 
- * @param[in,out] board Pointer to the board to update
+ * @param board Pointer to board to update
  * 
  * @pre board != NULL
- * @post board->clues == number of non-zero cells
+ * @post board->clues == actual count of non-zero cells
  * @post board->empty == board->total_cells - board->clues
  * 
  * @note Time complexity: O(n²) where n = board_size
- * @note This is safe to call multiple times (idempotent)
- * 
- * Common usage pattern:
- * @code
- * // After modifying several cells during generation/elimination
- * sudoku_board_set_cell(board, 3, 4, 7);
- * sudoku_board_set_cell(board, 5, 2, 0);  // Removing a cell
- * // ... more modifications ...
- * sudoku_board_update_stats(board);  // Refresh statistics
- * printf("Board has %d clues\n", board->clues);
- * @endcode
+ * @note Safe to call multiple times (idempotent)
  */
 void sudoku_board_update_stats(SudokuBoard *board) {
+    assert(board != NULL);
+    
     int count = 0;
     
-    // Scan entire board counting filled cells (using dynamic size)
-    for(int i = 0; i < board->board_size; i++) {
-        for(int j = 0; j < board->board_size; j++) {
-            if(board->cells[i][j] != 0) {
-                count++;  // Found a clue (non-empty cell)
+    // Count all non-zero cells
+    // NOTE: Uses board->board_size, works for any size board
+    for (int i = 0; i < board->board_size; i++) {
+        for (int j = 0; j < board->board_size; j++) {
+            if (board->cells[i][j] != 0) {
+                count++;
             }
         }
     }
     
-    // Update metadata based on count
+    // Update statistics
     board->clues = count;
     board->empty = board->total_cells - count;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: CELL ACCESS
+//                    CELL ACCESS
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Get the value of a specific cell
  * 
- * Retrieves the current value at the specified board position.
- * Provides read-only access to cell data through a controlled interface.
+ * Simple accessor function with bounds checking via assertions.
  * 
- * @param[in] board Pointer to the board
- * @param[in] row Row index (0 to board_size-1)
- * @param[in] col Column index (0 to board_size-1)
- * @return Cell value (0-board_size), where 0 represents empty cell
- * 
- * @pre board != NULL
- * @pre 0 <= row < board->board_size
- * @pre 0 <= col < board->board_size
- * 
- * @note Violating preconditions results in assertion failure in debug builds
- *       and undefined behavior in release builds
- * @note This function does not modify the board (const parameter)
- * 
- * Example:
- * @code
- * int value = sudoku_board_get_cell(board, 4, 5);
- * if (value == 0) {
- *     printf("Cell at (4,5) is empty\n");
- * } else {
- *     printf("Cell at (4,5) contains %d\n", value);
- * }
- * @endcode
- * 
- * @see sudoku_board_set_cell() to modify cell values
+ * @param board Pointer to the board
+ * @param row Row index (0 to board_size-1)
+ * @param col Column index (0 to board_size-1)
+ * @return Cell value (0 = empty, 1 to board_size = filled)
  */
 int sudoku_board_get_cell(const SudokuBoard *board, int row, int col) {
-    // Defensive programming: validate inputs in debug builds
     assert(board != NULL);
     assert(row >= 0 && row < board->board_size);
     assert(col >= 0 && col < board->board_size);
@@ -450,231 +378,114 @@ int sudoku_board_get_cell(const SudokuBoard *board, int row, int col) {
 /**
  * @brief Set the value of a specific cell
  * 
- * Updates the cell at the specified position with a new value.
- * Provides controlled write access with parameter validation.
+ * Updates the cell with bounds checking. Does NOT validate Sudoku rules
+ * or automatically update statistics - those are separate operations.
  * 
- * Important: This function does NOT perform Sudoku rule validation.
- * It only validates parameter ranges. Use sudoku_is_safe_position()
- * before calling this if you need to verify the move is legal.
- * 
- * Important: This function does NOT automatically update board statistics.
- * Call sudoku_board_update_stats() after a series of modifications
- * if you need accurate clues/empty counts.
- * 
- * @param[in,out] board Pointer to the board to modify
- * @param[in] row Row index (0 to board_size-1)
- * @param[in] col Column index (0 to board_size-1)
- * @param[in] value New cell value (0 to board_size)
- * @return true if the cell was successfully updated, false if any
- *         parameter was invalid
- * 
- * @pre board != NULL (enforced by return value)
- * @post If returns true, board->cells[row][col] == value
- * @post If returns false, board is not modified
- * 
- * @note Unlike get_cell(), this uses return value for validation rather
- *       than assertions, allowing graceful error handling
- * @note Board statistics are NOT automatically updated
- * @note Valid values: 0 (empty) to board_size (maximum number)
- * 
- * Example:
- * @code
- * if (sudoku_board_set_cell(board, 3, 4, 7)) {
- *     printf("Successfully set cell (3,4) to 7\n");
- * } else {
- *     printf("Invalid parameters\n");
- * }
- * @endcode
- * 
- * @see sudoku_board_get_cell() to read cell values
- * @see sudoku_board_update_stats() to refresh statistics
- * @see sudoku_is_safe_position() to validate Sudoku rules
+ * @param board Pointer to board to modify
+ * @param row Row index (0 to board_size-1)
+ * @param col Column index (0 to board_size-1)
+ * @param value New value (0 to board_size)
+ * @return true if successful, false if parameters invalid
  */
 bool sudoku_board_set_cell(SudokuBoard *board, int row, int col, int value) {
-    // Comprehensive parameter validation
-    if (board == NULL ||
-        row < 0 || row >= board->board_size ||
-        col < 0 || col >= board->board_size ||
-        value < 0 || value > board->board_size) {
-        return false;  // Invalid parameters - operation rejected
-    }
+    // Validation checks
+    if (board == NULL) return false;
+    if (row < 0 || row >= board->board_size) return false;
+    if (col < 0 || col >= board->board_size) return false;
+    if (value < 0 || value > board->board_size) return false;
     
-    // Parameters valid - update the cell
+    // Set the value
     board->cells[row][col] = value;
-    return true;  // Success
+    return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: STATISTICS ACCESS
+//                    STATISTICS ACCESS
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * @brief Get the number of filled cells (clues) in the board
- * 
- * Returns the cached count of non-zero cells. This count is maintained
- * by sudoku_board_init() and sudoku_board_update_stats().
- * 
- * @param[in] board Pointer to the board
- * @return Number of filled cells (0 to total_cells)
- * 
- * @pre board != NULL
- * 
- * @note This returns a cached value. After modifying cells with
- *       sudoku_board_set_cell(), call sudoku_board_update_stats()
- *       to ensure this value is accurate
- * 
- * Example:
- * @code
- * int clues = sudoku_board_get_clues(board);
- * printf("Puzzle has %d clues\n", clues);
- * @endcode
- * 
- * @see sudoku_board_get_empty() for the count of empty cells
- * @see sudoku_board_update_stats() to refresh cached statistics
- */
 int sudoku_board_get_clues(const SudokuBoard *board) {
     assert(board != NULL);
     return board->clues;
 }
 
-/**
- * @brief Get the number of empty cells in the board
- * 
- * Returns the cached count of zero-valued cells.
- * 
- * @param[in] board Pointer to the board
- * @return Number of empty cells (0 to total_cells)
- * 
- * @pre board != NULL
- * @note Invariant: get_clues() + get_empty() == total_cells
- * 
- * Example:
- * @code
- * int remaining = sudoku_board_get_empty(board);
- * printf("The puzzle has %d cells left to fill\n", remaining);
- * @endcode
- */
 int sudoku_board_get_empty(const SudokuBoard *board) {
     assert(board != NULL);
     return board->empty;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: DIMENSION QUERIES (NEW)
+//                    DIMENSION QUERIES
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * @brief Get the subgrid size
- * 
- * Returns the size of each subgrid (the n in n×n subgrids).
- * This is the fundamental dimension that determines board size.
- * 
- * @param[in] board Pointer to the board
- * @return Subgrid size (2, 3, 4, or 5)
- * 
- * @pre board != NULL
- * 
- * Example:
- * @code
- * int subgrid = sudoku_board_get_subgrid_size(board);
- * printf("Board has %d×%d subgrids\n", subgrid, subgrid);
- * @endcode
- */
 int sudoku_board_get_subgrid_size(const SudokuBoard *board) {
     assert(board != NULL);
     return board->subgrid_size;
 }
 
-/**
- * @brief Get the board size
- * 
- * Returns the dimensions of the board (the n in n×n board).
- * This is calculated as subgrid_size².
- * 
- * @param[in] board Pointer to the board
- * @return Board size (4, 9, 16, or 25)
- * 
- * @pre board != NULL
- * 
- * Example:
- * @code
- * int size = sudoku_board_get_board_size(board);
- * printf("Board is %d×%d\n", size, size);
- * @endcode
- */
 int sudoku_board_get_board_size(const SudokuBoard *board) {
     assert(board != NULL);
     return board->board_size;
 }
 
-/**
- * @brief Get total number of cells
- * 
- * Returns the total number of cells in the board.
- * This is calculated as board_size².
- * 
- * @param[in] board Pointer to the board
- * @return Total cells (16, 81, 256, or 625)
- * 
- * @pre board != NULL
- * 
- * Example:
- * @code
- * int total = sudoku_board_get_total_cells(board);
- * printf("Board has %d cells total\n", total);
- * @endcode
- */
 int sudoku_board_get_total_cells(const SudokuBoard *board) {
     assert(board != NULL);
     return board->total_cells;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API: SUBGRID GEOMETRY
+//                    SUBGRID GEOMETRY
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Create a subgrid structure from an index
  * 
- * Constructs a SudokuSubGrid structure representing one of the subgrids
- * that compose the Sudoku board. Subgrids are indexed in row-major order
- * (left to right, top to bottom).
+ * MATHEMATICAL FOUNDATION:
+ * ========================
  * 
- * For 9×9 board (3×3 subgrids):
- * @code
- *  0 | 1 | 2
- * ---+---+---
- *  3 | 4 | 5
- * ---+---+---
- *  6 | 7 | 8
- * @endcode
+ * For a board with subgrid_size s, we have s² subgrids arranged in
+ * an s×s pattern. Each subgrid is numbered from 0 to (s²-1) in
+ * row-major order.
  * 
- * The function calculates the top-left corner (base position) of the
- * subgrid using integer arithmetic.
+ * To find the base position (top-left corner) of subgrid index i:
  * 
- * @param[in] index Subgrid index (0 to board_size-1)
- * @return Initialized SudokuSubGrid structure with index and base position
+ * subgrid_row = i / s  (which subgrid row: 0, 1, 2, ...)
+ * subgrid_col = i % s  (which subgrid column: 0, 1, 2, ...)
  * 
- * @pre 0 <= index <= board_size-1
- * @post return.index == index
- * @post return.base contains valid top-left corner coordinates
+ * base_row = subgrid_row * s  (convert to actual board row)
+ * base_col = subgrid_col * s  (convert to actual board column)
  * 
- * @note The calculation uses integer division to map index to grid position
+ * EXAMPLE (9×9 board, subgrid_size = 3):
  * 
- * Example: Creating center subgrid of 9×9 board (index 4)
- * @code
- * SudokuSubGrid center = sudoku_subgrid_create(4);
- * // center.index == 4
- * // center.base.row == 3, center.base.col == 3
- * @endcode
+ * Subgrid indices:
+ * ┌───────┬───────┬───────┐
+ * │   0   │   1   │   2   │
+ * ├───────┼───────┼───────┤
+ * │   3   │   4   │   5   │
+ * ├───────┼───────┼───────┤
+ * │   6   │   7   │   8   │
+ * └───────┴───────┴───────┘
+ * 
+ * Subgrid 4 (center):
+ * - subgrid_row = 4 / 3 = 1
+ * - subgrid_col = 4 % 3 = 1
+ * - base_row = 1 * 3 = 3
+ * - base_col = 1 * 3 = 3
+ * - Base position = (3, 3) ✓
+ * 
+ * @param index Subgrid index (0 to board_size-1)
+ * @return Initialized SudokuSubGrid with index and base position
+ * 
+ * @note This function currently doesn't need board context because
+ *       it uses SUBGRID_SIZE constant. Future refactoring should
+ *       make it accept a board parameter for true multi-size support.
  */
 SudokuSubGrid sudoku_subgrid_create(int index) {
     SudokuSubGrid sg;
     sg.index = index;
     
-    // Calculate top-left corner of this subgrid
-    // For 9×9: index 4 → (4/3)*3 = 3 (row), (4%3)*3 = 3 (col)
-    // For 16×16: index 7 → (7/4)*4 = 4 (row), (7%4)*4 = 12 (col)
+    // Calculate base position using the formulas above
+    // NOTE: This still uses SUBGRID_SIZE constant - needs refactoring
+    // for true multi-size support in PHASE 2B
     sg.base.row = (index / SUBGRID_SIZE) * SUBGRID_SIZE;
     sg.base.col = (index % SUBGRID_SIZE) * SUBGRID_SIZE;
     
@@ -684,122 +495,50 @@ SudokuSubGrid sudoku_subgrid_create(int index) {
 /**
  * @brief Get absolute board position from subgrid-relative cell index
  * 
- * Converts a cell index within a subgrid to absolute board coordinates.
- * This allows treating each subgrid as its own mini-grid with positions
- * numbered 0 to (subgrid_size²-1).
+ * MATHEMATICAL FOUNDATION:
+ * ========================
  * 
- * Cell indices within a 3×3 subgrid:
- * @code
- *  0 1 2
- *  3 4 5
- *  6 7 8
- * @endcode
+ * Within a subgrid of size s×s, cells are numbered 0 to (s²-1) in
+ * row-major order. To convert subgrid-relative index to absolute
+ * board position:
  * 
- * The function maps these indices to absolute positions by adding the
- * subgrid's base offset to the relative position within the subgrid.
+ * relative_row = cell_index / s  (which row within subgrid)
+ * relative_col = cell_index % s  (which column within subgrid)
  * 
- * @param[in] sg Pointer to the subgrid structure defining base position
- * @param[in] cell_index Cell index within subgrid (0 to subgrid_size²-1)
- * @return Absolute position on the full board
+ * absolute_row = sg->base.row + relative_row
+ * absolute_col = sg->base.col + relative_col
  * 
- * @pre sg != NULL
- * @pre 0 <= cell_index < subgrid_size²
- * @post return contains valid board coordinates
+ * EXAMPLE (3×3 subgrid starting at (3,3)):
  * 
- * Example: Center subgrid (base 3,3), cell 4 (center of subgrid)
- * @code
- * SudokuSubGrid center = sudoku_subgrid_create(4);
- * SudokuPosition pos = sudoku_subgrid_get_position(&center, 4);
- * // pos.row == 3 + (4/3) = 4
- * // pos.col == 3 + (4%3) = 4
- * // Result: position (4,4) which is the center of the entire board
- * @endcode
+ * Subgrid cell indices:
+ * ┌───┬───┬───┐
+ * │ 0 │ 1 │ 2 │
+ * ├───┼───┼───┤
+ * │ 3 │ 4 │ 5 │
+ * ├───┼───┼───┤
+ * │ 6 │ 7 │ 8 │
+ * └───┴───┴───┘
+ * 
+ * Cell index 4 (center):
+ * - relative_row = 4 / 3 = 1
+ * - relative_col = 4 % 3 = 1
+ * - absolute_row = 3 + 1 = 4
+ * - absolute_col = 3 + 1 = 4
+ * - Final position = (4, 4) ✓
+ * 
+ * @param sg Pointer to subgrid structure
+ * @param cell_index Cell index within subgrid (0 to subgrid_size²-1)
+ * @return Absolute position on the board
  */
-SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, int cell_index) {
+SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, 
+                                           int cell_index) {
     SudokuPosition pos;
     
-    // Calculate position relative to subgrid's top-left corner
+    // Calculate relative position within subgrid
+    // NOTE: Still uses SUBGRID_SIZE constant - needs board parameter
+    // in PHASE 2B for true multi-size support
     pos.row = sg->base.row + (cell_index / SUBGRID_SIZE);
     pos.col = sg->base.col + (cell_index % SUBGRID_SIZE);
     
     return pos;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//                    INTERNAL: GENERATION HELPERS
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * @brief Indices of the three diagonal subgrids
- * 
- * For 9×9 board: {0, 4, 8} (top-left, center, bottom-right)
- * For 4×4 board: {0, 3} would be diagonal (but we use all appropriate ones)
- * 
- * These subgrids are independent - placing numbers in one cannot
- * conflict with the others since they share no rows, columns, or regions.
- * 
- * @note For non-9×9 boards, this might need adjustment
- */
-static const int DIAGONAL_INDICES[3] = {0, 4, 8};
-
-/**
- * @brief Fill a specific subgrid with random numbers using Fisher-Yates
- * 
- * Internal helper function used during diagonal initialization phase of
- * puzzle generation. Fills all cells of the specified subgrid with a
- * random permutation of numbers 1 to board_size.
- * 
- * @param[in,out] board Pointer to the board being generated
- * @param[in] sg Pointer to the subgrid structure to fill
- * 
- * @pre board != NULL && sg != NULL
- * @pre sg represents one of the diagonal subgrids for conflict-free filling
- * @post All cells in the subgrid contain unique numbers 1 to board_size
- * 
- * @note This function is silent - progress events are emitted by caller
- * @note Uses sudoku_generate_permutation() for Fisher-Yates shuffle
- * 
- * @internal This is an internal helper not exposed in public API
- */
-void fillSubGrid(SudokuBoard *board, const SudokuSubGrid *sg) {
-    // Generate random permutation of 1 to board_size
-    int numbers[board->board_size];  // VLA for flexibility
-    sudoku_generate_permutation(numbers, board->board_size, 1);
-    
-    // Place each number in the corresponding cell of the subgrid
-    for(int i = 0; i < board->board_size; i++) {
-        SudokuPosition pos = sudoku_subgrid_get_position(sg, i);
-        board->cells[pos.row][pos.col] = numbers[i];
-    }
-}
-
-/**
- * @brief Fill the three diagonal subgrids with random permutations
- * 
- * First phase of the puzzle generation algorithm. Fills the diagonal
- * subgrids with random permutations.
- * 
- * For 9×9: Fills subgrids 0, 4, 8 (top-left, center, bottom-right)
- * 
- * These subgrids are independent because they share no rows, columns,
- * or regions with each other. This allows us to fill them without
- * validation, which is efficient and ensures uniform distribution.
- * 
- * @param[in,out] board Pointer to the board to initialize
- * 
- * @pre board != NULL
- * @pre board is initialized (typically via sudoku_board_init)
- * @post Diagonal subgrids contain random valid permutations
- * 
- * @note This function is silent - events emitted from generator.c
- * @note For non-9×9 boards, this may need adjustment
- * 
- * @internal This is an internal helper not exposed in public API
- */
-void fillDiagonal(SudokuBoard *board) {
-    // Fill each of the three independent diagonal subgrids
-    for(int i = 0; i < 3; i++) {
-        SudokuSubGrid sg = sudoku_subgrid_create(DIAGONAL_INDICES[i]);
-        fillSubGrid(board, &sg);
-    }
 }

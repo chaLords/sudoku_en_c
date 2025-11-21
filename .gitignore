@@ -92,7 +92,6 @@ vgcore.*
 
 
 # Backup
+backups/
 *.backup
-.cache/
-.cache/
 .cache/
