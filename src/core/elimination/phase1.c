@@ -92,8 +92,7 @@ int phase1Elimination(SudokuBoard *board, const int *index, int count) {
     
     // Process each subgrid in the order specified by index array
     for (int idx = 0; idx < count; idx++) {
-        SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx]);
-        
+        SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx], board->subgrid_size);        
         // Select which number to remove from this subgrid
         // Uses the idx-th element of the permutation
         int target_value = numbers[idx];

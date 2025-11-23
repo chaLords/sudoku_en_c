@@ -437,108 +437,47 @@ int sudoku_board_get_total_cells(const SudokuBoard *board) {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Create a subgrid structure from an index
- * 
- * MATHEMATICAL FOUNDATION:
- * ========================
- * 
- * For a board with subgrid_size s, we have s² subgrids arranged in
- * an s×s pattern. Each subgrid is numbered from 0 to (s²-1) in
- * row-major order.
- * 
- * To find the base position (top-left corner) of subgrid index i:
- * 
- * subgrid_row = i / s  (which subgrid row: 0, 1, 2, ...)
- * subgrid_col = i % s  (which subgrid column: 0, 1, 2, ...)
- * 
- * base_row = subgrid_row * s  (convert to actual board row)
- * base_col = subgrid_col * s  (convert to actual board column)
- * 
- * EXAMPLE (9×9 board, subgrid_size = 3):
- * 
- * Subgrid indices:
- * ┌───────┬───────┬───────┐
- * │   0   │   1   │   2   │
- * ├───────┼───────┼───────┤
- * │   3   │   4   │   5   │
- * ├───────┼───────┼───────┤
- * │   6   │   7   │   8   │
- * └───────┴───────┴───────┘
- * 
- * Subgrid 4 (center):
- * - subgrid_row = 4 / 3 = 1
- * - subgrid_col = 4 % 3 = 1
- * - base_row = 1 * 3 = 3
- * - base_col = 1 * 3 = 3
- * - Base position = (3, 3) ✓
+ * @brief Creates a SubGrid structure from an index and subgrid size
  * 
  * @param index Subgrid index (0 to board_size-1)
- * @return Initialized SudokuSubGrid with index and base position
+ * @param subgrid_size Size of subgrid (k in k×k subgrids)
+ * @return SudokuSubGrid with calculated base position
  * 
- * @note This function currently doesn't need board context because
- *       it uses SUBGRID_SIZE constant. Future refactoring should
- *       make it accept a board parameter for true multi-size support.
+ * PHASE 2C FIX: Now accepts subgrid_size parameter instead of using
+ * hardcoded SUBGRID_SIZE constant. This enables correct operation
+ * for all board sizes (4×4, 9×9, 16×16, 25×25).
  */
-SudokuSubGrid sudoku_subgrid_create(int index) {
+SudokuSubGrid sudoku_subgrid_create(int index, int subgrid_size) {
     SudokuSubGrid sg;
     sg.index = index;
+    sg.subgrid_size = subgrid_size;  // Store for use in get_position
     
-    // Calculate base position using the formulas above
-    // NOTE: This still uses SUBGRID_SIZE constant - needs refactoring
-    // for true multi-size support in PHASE 2B
-    sg.base.row = (index / SUBGRID_SIZE) * SUBGRID_SIZE;
-    sg.base.col = (index % SUBGRID_SIZE) * SUBGRID_SIZE;
+    // Calculate base position using dynamic subgrid_size
+    sg.base.row = (index / subgrid_size) * subgrid_size;
+    sg.base.col = (index % subgrid_size) * subgrid_size;
     
     return sg;
 }
-
 /**
- * @brief Get absolute board position from subgrid-relative cell index
+ * @brief Gets the absolute board position of a cell within a subgrid
  * 
- * MATHEMATICAL FOUNDATION:
- * ========================
+ * @param sg Pointer to the SubGrid structure
+ * @param cell_index Index of cell within subgrid (0 to subgrid_size²-1)
+ * @return SudokuPosition with absolute row and column on the board
  * 
- * Within a subgrid of size s×s, cells are numbered 0 to (s²-1) in
- * row-major order. To convert subgrid-relative index to absolute
- * board position:
+ * PHASE 2C FIX: Now uses sg->subgrid_size instead of hardcoded constant.
+ * This correctly calculates positions for all board sizes.
  * 
- * relative_row = cell_index / s  (which row within subgrid)
- * relative_col = cell_index % s  (which column within subgrid)
- * 
- * absolute_row = sg->base.row + relative_row
- * absolute_col = sg->base.col + relative_col
- * 
- * EXAMPLE (3×3 subgrid starting at (3,3)):
- * 
- * Subgrid cell indices:
- * ┌───┬───┬───┐
- * │ 0 │ 1 │ 2 │
- * ├───┼───┼───┤
- * │ 3 │ 4 │ 5 │
- * ├───┼───┼───┤
- * │ 6 │ 7 │ 8 │
- * └───┴───┴───┘
- * 
- * Cell index 4 (center):
- * - relative_row = 4 / 3 = 1
- * - relative_col = 4 % 3 = 1
- * - absolute_row = 3 + 1 = 4
- * - absolute_col = 3 + 1 = 4
- * - Final position = (4, 4) ✓
- * 
- * @param sg Pointer to subgrid structure
- * @param cell_index Cell index within subgrid (0 to subgrid_size²-1)
- * @return Absolute position on the board
+ * Example for 16×16 board (subgrid_size=4):
+ *   cell_index=15 → row offset = 15/4 = 3, col offset = 15%4 = 3
+ *   With base (12,12): position = (12+3, 12+3) = (15,15) ✓
  */
-SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, 
-                                           int cell_index) {
+SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, int cell_index) {
     SudokuPosition pos;
     
-    // Calculate relative position within subgrid
-    // NOTE: Still uses SUBGRID_SIZE constant - needs board parameter
-    // in PHASE 2B for true multi-size support
-    pos.row = sg->base.row + (cell_index / SUBGRID_SIZE);
-    pos.col = sg->base.col + (cell_index % SUBGRID_SIZE);
+    // Use stored subgrid_size for correct calculation on all board sizes
+    pos.row = sg->base.row + (cell_index / sg->subgrid_size);
+    pos.col = sg->base.col + (cell_index % sg->subgrid_size);
     
     return pos;
 }

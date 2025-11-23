@@ -130,8 +130,7 @@ void test_subgrid_create(void) {
     
     /* Probar todas las subcuadriculas (0-8) */
     for(int idx = 0; idx < 9; idx++) {
-        SudokuSubGrid sg = sudoku_subgrid_create(idx);
-        
+        SudokuSubGrid sg = sudoku_subgrid_create(idx, 3);  // 3×3 subgrids for 9×9 board        
         int expected_row = (idx / 3) * 3;
         int expected_col = (idx % 3) * 3;
         
@@ -160,8 +159,7 @@ void test_subgrid_get_position(void) {
     printf("TEST 4: sudoku_subgrid_get_position() - Position Mapping\n");
     printf("===============================================================\n");
     
-    SudokuSubGrid sg = sudoku_subgrid_create(4);  /* Centro (base: 3,3) */
-    
+    SudokuSubGrid sg = sudoku_subgrid_create(4, 3);  /* Centro (base: 3,3) for 9×9 */    
     /* Test: cell_index 0 debe dar posicion (3,3) */
     SudokuPosition pos0 = sudoku_subgrid_get_position(&sg, 0);
     TEST_ASSERT(pos0.row == 3 && pos0.col == 3, 
@@ -194,8 +192,7 @@ void test_subgrid_fill(void) {
     printf("  [FAIL] Could not create board\n");
     return;
     }    
-    SudokuSubGrid sg = sudoku_subgrid_create(0);  /* Top-left (0,0) */
-    
+    SudokuSubGrid sg = sudoku_subgrid_create(0, 3);  /* Top-left (0,0) for 9×9 */    
     /* Llenar manualmente con numeros 1-9 */
     int numbers[9] = {5, 3, 7, 6, 2, 1, 9, 8, 4};
     for(int i = 0; i < 9; i++) {

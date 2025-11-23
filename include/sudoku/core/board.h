@@ -313,8 +313,7 @@ int sudoku_board_get_total_cells(const SudokuBoard *board);
  * 
  * @note For 9×9 board: index 0 = top-left, index 8 = bottom-right
  */
-SudokuSubGrid sudoku_subgrid_create(int index);
-
+SudokuSubGrid sudoku_subgrid_create(int index, int subgrid_size);
 /**
  * @brief Get absolute board position from subgrid-relative cell index
  * 
