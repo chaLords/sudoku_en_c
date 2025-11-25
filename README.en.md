@@ -1,12 +1,12 @@
+=== INICIO README.en.md ===
 # 🎮 Sudoku Generator Library
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![C](https://img.shields.io/badge/C-00599C?style=flat&logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
-[![Version](https://img.shields.io/badge/version-2.2.2-brightgreen.svg)](https://github.com/chaLords/sudoku_en_c/releases)
+[![Version](https://img.shields.io/badge/version-2.3.0-brightgreen.svg)](https://github.com/chaLords/sudoku_en_c/releases)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/chaLords/sudoku_en_c)
 
 > Professional C library for generating Sudoku puzzles with guaranteed unique solutions. Modular architecture, clean API, and optimized hybrid Fisher-Yates + Backtracking algorithm.
-
 ```
 ┌───────┬───────┬───────┐
 │ . 4 . │ . 3 . │ 7 . . │
@@ -27,7 +27,7 @@
 
 ## ✨ Key Features
 
-- **🎯 High Success Rate**: ~99.9% on first attempt
+- **🎯 High Success Rate**: ~99.9% for 9×9, ~99% for 4×4 (improved in v2.3.0)
 - **✓ Guaranteed Unique Solution**: Exhaustive verification with early-exit
 - **⚡ Fast**: Typical generation <10ms
 - **🎲 Uniformly Random**: Fisher-Yates for uniform distribution
@@ -39,8 +39,13 @@
 
 ---
 
-## 🚀 Quick Start
+## 🆕 What's New in v2.3.0
 
+Version 2.3.0 introduces **Phase 2C**, a complete refactoring of the elimination system with intelligent retry mechanism. Key improvements include dramatically increased success rate for 4×4 boards (from 30% to 99%) through adaptive retry logic, clear modular separation between Phase 2A (strategic elimination), Phase 2B (retry loop), and Phase 2C (integrated system), and comprehensive test coverage with over 55 unit tests validating correct behavior across different board sizes and edge cases.
+
+---
+
+## 🚀 Quick Start
 ```bash
 # Clone repository
 git clone https://github.com/chaLords/sudoku_en_c.git
@@ -54,7 +59,6 @@ make
 ```
 
 ### Use as Library
-
 ```c
 #include <sudoku/sudoku.h>
 #include <stdio.h>
@@ -75,7 +79,6 @@ int main(void) {
     return 0;
 }
 ```
-
 ```bash
 gcc my_program.c -I include -L lib -lsudoku_core -o my_program
 ./my_program
@@ -87,12 +90,11 @@ gcc my_program.c -I include -L lib -lsudoku_core -o my_program
 
 ### Prerequisites
 
-- GCC/Clang (C11 or later)
+- GCC/Clang (C11 or higher)
 - Make or CMake
 - Git
 
 ### Option 1: Make (Recommended)
-
 ```bash
 # Build library and CLI
 make
@@ -116,7 +118,6 @@ This generates:
 - Headers in `include/sudoku/`
 
 ### Option 2: CMake
-
 ```bash
 mkdir build && cd build
 cmake ..
@@ -125,13 +126,12 @@ sudo make install  # Optional
 ```
 
 ### Option 3: Manual Compilation
-
 ```bash
-# Compile library
+# Build library
 gcc -c -I include src/core/*.c src/core/*/*.c
 ar rcs libsudoku.a *.o
 
-# Compile CLI
+# Build CLI
 gcc -I include tools/generator_cli/main.c -L. -lsudoku -o sudoku
 ```
 
@@ -140,7 +140,6 @@ gcc -I include tools/generator_cli/main.c -L. -lsudoku -o sudoku
 ## 📖 Basic Usage
 
 ### CLI - Verbosity Modes
-
 ```bash
 # Mode 0: Minimal (result only)
 ./sudoku_generator 0
@@ -149,14 +148,13 @@ gcc -I include tools/generator_cli/main.c -L. -lsudoku -o sudoku
 ./sudoku_generator 1
 ./sudoku_generator
 
-# Mode 2: Detailed (complete debugging)
+# Mode 2: Detailed (full debugging)
 ./sudoku_generator 2
 ```
 
 ### API - Main Functions
 
 #### Generate Puzzle
-
 ```c
 SudokuBoard board;
 SudokuGenerationStats stats;
@@ -168,7 +166,6 @@ if (sudoku_generate(&board, &stats)) {
 ```
 
 #### Validate Puzzle
-
 ```c
 if (sudoku_validate_board(&board)) {
     printf("✓ Valid puzzle\n");
@@ -176,7 +173,6 @@ if (sudoku_validate_board(&board)) {
 ```
 
 #### Verify Unique Solution
-
 ```c
 int solutions = countSolutionsExact(&board, 2);
 if (solutions == 1) {
@@ -185,7 +181,6 @@ if (solutions == 1) {
 ```
 
 #### Configure Verbosity
-
 ```c
 sudoku_set_verbosity(1);  // 0=minimal, 1=compact, 2=detailed
 ```
@@ -195,16 +190,15 @@ sudoku_set_verbosity(1);  // 0=minimal, 1=compact, 2=detailed
 ---
 
 ## 🏗️ Project Structure
-
 ```
 sudoku_en_c/
 ├── include/sudoku/       # 🔓 Public API
 │   └── core/             # Public headers (types, generator, validation, board, display)
 ├── src/core/             # 🔒 Implementation
 │   ├── algorithms/       # Backtracking, Fisher-Yates
-│   ├── elimination/      # 3-phase system
+│   ├── elimination/      # 3-phase system (Phase 2C)
 │   └── internal/         # Private headers
-├── tests/unit/           # ✅ Tests by module
+├── tests/unit/           # ✅ Tests per module (55+ tests)
 ├── tools/                # 🛠️ CLI and utilities
 └── docs/                 # 📚 Technical documentation
 ```
@@ -224,6 +218,7 @@ sudoku_en_c/
 3. **3-Phase Elimination**:
    - **Phase 1**: Random selection (1 per subgrid)
    - **Phase 2**: No-alternatives elimination (iterative)
+   - **Phase 2C**: Retry mechanism with adaptive logic (new in v2.3.0)
    - **Phase 3**: Free elimination with uniqueness verification
 
 ### Technical Characteristics
@@ -232,6 +227,7 @@ sudoku_en_c/
 - **Optimizations**: Early-exit, intelligent pruning, randomization
 - **Verification**: Exhaustive counting with configurable limit
 - **Distribution**: Uniformly random thanks to Fisher-Yates
+- **Reliability**: Adaptive retry for small boards (4×4)
 
 📖 **Mathematical analysis**: See [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 
@@ -239,17 +235,22 @@ sudoku_en_c/
 
 ## 🗺️ Roadmap
 
-### ✅ v2.2.2 (Current - November 2025)
+### ✅ v2.3.0 (Current - January 2025)
 - Complete modularization
+- Phase 2C with retry mechanism
+- 55+ unit tests
+- 99% success rate on 4×4 boards
+
+### ✅ v2.2.2 (November 2024)
 - Stable public API (`include/sudoku/`)
 - Architecture prepared for v3.0
 
-### 🚧 v2.3 (Q1 2025)
-- Complete unit tests
+### 🚧 v2.4 (Q2 2025)
+- Complete unit test coverage
 - Flexible configuration system
-- Puzzle export/import
+- Export/import puzzles
 
-### 🔮 v3.0 (Q2 2025)
+### 🔮 v3.0 (Q3 2025)
 - Multi-size support (4x4, 16x16, 25x25)
 - Opaque pointers
 - Dynamic memory
@@ -274,7 +275,7 @@ Contributions are welcome! To contribute:
 
 ## 📄 License
 
-This project is licensed under Apache License 2.0 - see [LICENSE](LICENSE) for details.
+This project is under Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 **Attribution Requirements**:
 ```
@@ -299,7 +300,7 @@ Licensed under Apache License 2.0
 - **[Architecture](docs/ARCHITECTURE.md)** - Architectural design and implementation decisions
 - **[Algorithms](docs/ALGORITHMS.md)** - Mathematical analysis and algorithms
 - **[Usage Guide](docs/USAGE.md)** - Advanced examples and use cases
-- **[Contributing](CONTRIBUTING.md)** - Contributor's guide
+- **[Contributing](CONTRIBUTING.md)** - Guide for contributors
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ---
@@ -319,3 +320,4 @@ Licensed under Apache License 2.0
 ## 🌐 Other Languages
 
 - [Español](README.md)
+=== FIN README.en.md ===

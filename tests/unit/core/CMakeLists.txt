@@ -32,7 +32,9 @@ target_include_directories(test_validation PRIVATE
 
 add_test(NAME ValidationTests COMMAND test_validation)
 
-# Test de generator (cuando lo crees)
+# =============================================================================
+# Test de Generator (comentado temporalmente)
+# =============================================================================
 # add_executable(test_generator
 #     test_generator.c
 # )
@@ -43,6 +45,7 @@ add_test(NAME ValidationTests COMMAND test_validation)
 # 
 # target_include_directories(test_generator PRIVATE
 #     ${PROJECT_SOURCE_DIR}/include
+#     ${PROJECT_SOURCE_DIR}/src/core
 # )
 # 
 # add_test(NAME GeneratorTests COMMAND test_generator)

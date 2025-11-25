@@ -1,241 +1,297 @@
 /**
- * @file elimination.c
- * @brief Three-phase cell elimination strategy for puzzle generation
+ * @file phase2.c (ADAPTED FOR CONFIGURABLE BOARD SIZES)
+ * @brief Phase 2: Heuristic elimination of numbers without alternatives
  * @author Gonzalo Ramírez
- * @date 2025-11-06
+ * @date 2025-11-21
  * 
- * This module implements the sophisticated three-phase elimination algorithm
- * that transforms a complete valid Sudoku board into a playable puzzle with
- * unique solution. The strategy balances computational efficiency with puzzle
- * quality through increasingly selective elimination phases.
+ * ARCHITECTURAL CHANGES FOR CONFIGURABLE SIZES:
  * 
- * Algorithm Overview:
+ * 1. REPLACED: All hardcoded SUDOKU_SIZE (9) constants
+ *    WITH: Dynamic board->board_size access
+ *    
+ * 2. REPLACED: Hardcoded SUBGRID_SIZE (3) constants
+ *    WITH: Dynamic calculation sqrt(board_size)
+ *    
+ * 3. MAINTAINED: Event-driven architecture (no printf)
+ * 4. MAINTAINED: Original algorithm logic unchanged
  * 
- * PHASE 1: Balanced Initial Distribution
- * Removes exactly one randomly-selected number from each of the 9 subgrids,
- * ensuring even distribution of empty cells across the board. This phase is
- * fast (O(n)) and prevents creation of visually unbalanced puzzles.
+ * CRITICAL INSIGHT: The hasAlternative() function is the heart of Phase 2.
+ * Its logic involves checking row, column, and subgrid for alternative
+ * positions. All three searches must use dynamic sizes.
  * 
- * PHASE 2: Heuristic Safe Elimination
- * Iteratively removes numbers that have no alternative valid positions in
- * their constraint regions (row, column, or subgrid). These removals are
- * "safe" because they cannot introduce solution ambiguity - the removed
- * number could only go in that specific position. This phase is moderately
- * fast (O(n²)) and typically removes 10-20 additional cells.
+ * MATHEMATICAL FOUNDATION:
+ * For an N×N board with √N×√N subgrids:
+ * - Row search: positions 0 to N-1 in same row
+ * - Column search: positions 0 to N-1 in same column
+ * - Subgrid search: positions in the √N×√N region containing the cell
  * 
- * PHASE 3: Exhaustive Verified Elimination
- * Attempts free elimination of remaining cells in random order, using
- * exhaustive backtracking to verify that each removal maintains exactly
- * one solution. This is computationally expensive (potentially O(9^m) per
- * verification where m = empty cells) but guarantees puzzle uniqueness,
- * which is a fundamental requirement for quality Sudoku puzzles.
- * 
- * The three-phase approach is significantly more efficient than naive
- * exhaustive verification from the start, as Phases 1-2 quickly remove
- * ~15-20 cells before entering the expensive Phase 3 verification loop.
- * 
- * Design Decisions:
- * - Phase 1 uses Fisher-Yates shuffled numbers to ensure uniform randomness
- * - Phase 2 checks alternatives in all three constraint dimensions
- * - Phase 3 uses dynamic memory allocation to avoid stack overflow with
- *   large position arrays
- * - All phases support configurable verbosity for debugging and education
+ * The subgrid calculation uses: base = pos - (pos % √N)
+ * This formula works for any perfect square board size.
  */
 
-#include "elimination_internal.h"           // For our own function declarations
-#include "board_internal.h"                 // For SudokuBoard structure (needs direct cell access)
-#include "events_internal.h"                // For internal function events
-#include "sudoku/core/validation.h"         // For sudoku_is_safe_position(), countSolutionsExact()
-#include "sudoku/core/board.h"              // For subgrid utilities
-#include <stdbool.h>                        // For bool type
-
-// ═══════════════════════════════════════════════════════════════════
-//                    ALTERNATIVE POSITION DETECTION
-// ═══════════════════════════════════════════════════════════════════
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <math.h>
+#include "algorithms_internal.h"
+#include "elimination_internal.h"
+#include "events_internal.h"
+#include "sudoku/core/validation.h"
+#include "sudoku/core/board.h"
 
 /**
- * @brief Check if a number has alternative valid positions in its regions
+ * @brief Check if a number has alternative valid positions
  * 
- * This function implements a critical heuristic for Phase 2 elimination:
- * determining whether a number at a given position could be legally placed
- * in any other empty cell within its row, column, or 3x3 subgrid.
+ * ADAPTATION FOR CONFIGURABLE SIZES:
  * 
- * If no alternatives exist, the number is "locked" to this position by
- * Sudoku constraints, meaning it can be safely removed without creating
- * solution ambiguity. This is much faster than exhaustive solution counting
- * but still effective for identifying removable cells.
+ * This function must check three constraint regions (row, column, subgrid)
+ * for alternative placement positions. All loop bounds and calculations
+ * are now derived from the board's actual dimensions.
  * 
- * Algorithm:
+ * ALGORITHM EXPLANATION:
  * 1. Temporarily remove the number from its current position
- * 2. Search row, column, and subgrid for other empty cells
- * 3. For each empty cell, test if the number could legally go there
- * 4. Restore the number to its original position
- * 5. Return true if any alternative position was found
+ * 2. For each empty cell in the row: check if number could go there
+ * 3. For each empty cell in the column: check if number could go there
+ * 4. For each empty cell in the subgrid: check if number could go there
+ * 5. Restore the original number
+ * 6. Return true if ANY alternative was found, false otherwise
  * 
- * The function uses early exit optimization: stops searching as soon as
- * one alternative is found, avoiding unnecessary validation checks.
+ * EARLY EXIT OPTIMIZATION:
+ * The loops terminate as soon as one alternative is found (alternatives > 0).
+ * This transforms worst-case O(3N) to average-case O(k) where k << N.
  * 
- * @param[in,out] board Board to analyze (temporarily modified, then restored)
- * @param[in] pos Position of the cell containing the number to check
- * @param[in] num The number to check for alternatives
- * @return true if the number has at least one alternative position,
- *         false if it's locked to this position
+ * @param board The Sudoku board
+ * @param pos Position of the number to check
+ * @param num The number to check for alternatives
+ * @return true if the number has at least one alternative position
  * 
  * @pre board != NULL && pos != NULL
- * @pre board->cells[pos->row][pos->col] == num
- * @pre 1 <= num <= 9
- * @post Board is restored to identical state as before call
- * 
- * @note Time complexity: O(n²) worst case (checking all cells in 3 regions),
- *       but typically much faster due to early exit optimization
- * @note The temporary modification is safe because we always restore state
- * 
- * @internal Used exclusively by phase2Elimination()
+ * @pre board->cells[pos->row][pos->col] == num (or temporarily 0)
  */
 bool hasAlternative(SudokuBoard *board, const SudokuPosition *pos, int num) {
-    // Save original value and temporarily empty the cell
-    // This allows us to check if the number could go elsewhere
-    int original_value = board->cells[pos->row][pos->col];
+    // ✅ ADAPTACIÓN 1: Obtener dimensiones dinámicas del tablero
+    // ANTES: Usaba constantes SUDOKU_SIZE (9) y SUBGRID_SIZE (3)
+    // AHORA: Consulta las dimensiones reales del tablero
+    int board_size = sudoku_board_get_board_size(board);
+    int subgrid_size = sudoku_board_get_subgrid_size(board);
+    
+    // Step 1: Temporarily remove the number
+    // This allows isSafePosition to consider this cell as "available"
+    int temp = board->cells[pos->row][pos->col];
     board->cells[pos->row][pos->col] = 0;
     
     int alternatives = 0;
     
-    // Search in row: check each column position in this row
-    // Early exit: stop as soon as we find one alternative
-    for (int col = 0; col < SUDOKU_SIZE && alternatives == 0; col++) {
-        // Skip the original position and non-empty cells
+    // ═══════════════════════════════════════════════════════════════
+    // SEARCH IN ROW: Check all other empty cells in the same row
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ ADAPTACIÓN 2: Usar board_size en lugar de SUDOKU_SIZE
+    for (int col = 0; col < board_size && alternatives == 0; col++) {
+        // Skip the current position itself
         if (col != pos->col && board->cells[pos->row][col] == 0) {
             SudokuPosition test_pos = {pos->row, col};
             if (sudoku_is_safe_position(board, &test_pos, num)) {
-                alternatives++;  // Found alternative position in row
+                alternatives++;
             }
         }
     }
     
-    // Search in column: check each row position in this column
-    for (int row = 0; row < SUDOKU_SIZE && alternatives == 0; row++) {
-        // Skip the original position and non-empty cells
+    // ═══════════════════════════════════════════════════════════════
+    // SEARCH IN COLUMN: Check all other empty cells in the same column
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ ADAPTACIÓN 3: Usar board_size en lugar de SUDOKU_SIZE
+    for (int row = 0; row < board_size && alternatives == 0; row++) {
+        // Skip the current position itself
         if (row != pos->row && board->cells[row][pos->col] == 0) {
             SudokuPosition test_pos = {row, pos->col};
             if (sudoku_is_safe_position(board, &test_pos, num)) {
-                alternatives++;  // Found alternative position in column
+                alternatives++;
             }
         }
     }
     
-    // Search in 3x3 subgrid: only if no alternatives found yet
+    // ═══════════════════════════════════════════════════════════════
+    // SEARCH IN SUBGRID: Check all other empty cells in the same subgrid
+    // ═══════════════════════════════════════════════════════════════
     if (alternatives == 0) {
-        // Calculate top-left corner of the subgrid containing this position
-        int subgrid_row_start = pos->row - (pos->row % SUBGRID_SIZE);
-        int subgrid_col_start = pos->col - (pos->col % SUBGRID_SIZE);
+        // ✅ ADAPTACIÓN 4: Cálculo dinámico de la base de la subcuadrícula
+        // ANTES: rowStart = pos->row - (pos->row % 3)
+        // AHORA: rowStart = pos->row - (pos->row % subgrid_size)
+        //
+        // PRUEBA MATEMÁTICA de por qué esto funciona:
+        // Sea r = pos->row, k = subgrid_size
+        // Por definición de módulo: r = q*k + (r % k) donde q = floor(r/k)
+        // Entonces: r - (r % k) = q*k = inicio de la subcuadrícula q
+        //
+        // Ejemplo para 9×9 (k=3): row=7 → 7-(7%3) = 7-1 = 6 (fila 6)
+        // Ejemplo para 16×16 (k=4): row=7 → 7-(7%4) = 7-3 = 4 (fila 4)
+        int row_start = pos->row - (pos->row % subgrid_size);
+        int col_start = pos->col - (pos->col % subgrid_size);
         
-        // Check all 9 cells in the subgrid
-        for (int i = 0; i < SUBGRID_SIZE && alternatives == 0; i++) {
-            for (int j = 0; j < SUBGRID_SIZE && alternatives == 0; j++) {
-                int row = subgrid_row_start + i;
-                int col = subgrid_col_start + j;
+        // ✅ ADAPTACIÓN 5: Usar subgrid_size para límites de iteración
+        for (int i = 0; i < subgrid_size && alternatives == 0; i++) {
+            for (int j = 0; j < subgrid_size && alternatives == 0; j++) {
+                int r = row_start + i;
+                int c = col_start + j;
                 
-                // Skip the original position and non-empty cells
-                if ((row != pos->row || col != pos->col) && 
-                    board->cells[row][col] == 0) {
-                    SudokuPosition test_pos = {row, col};
+                // Skip the current position itself
+                if ((r != pos->row || c != pos->col) && board->cells[r][c] == 0) {
+                    SudokuPosition test_pos = {r, c};
                     if (sudoku_is_safe_position(board, &test_pos, num)) {
-                        alternatives++;  // Found alternative in subgrid
+                        alternatives++;
                     }
                 }
             }
         }
     }
     
-    // Restore original value (critical for correctness!)
-    board->cells[pos->row][pos->col] = original_value;
+    // Step 5: Restore the original number
+    // CRITICAL: Forgetting this causes board corruption!
+    board->cells[pos->row][pos->col] = temp;
     
-    // Return true if at least one alternative position exists
     return alternatives > 0;
 }
-// ═══════════════════════════════════════════════════════════════════
-//                    PHASE 2: HEURISTIC ELIMINATION
-// ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Phase 2: Remove numbers without alternative positions
+ * @brief Phase 2: Remove numbers that have no alternative positions
  * 
- * Second elimination phase that applies an intelligent heuristic: remove
- * numbers that have no other valid positions in their constraint regions.
- * These cells are "safe" to remove because they cannot introduce solution
- * ambiguity - the number must go in that specific position.
+ * ALGORITHM OVERVIEW:
  * 
- * This heuristic elimination is much faster than exhaustive solution counting
- * (O(n²) vs potentially O(9^m)) while still being effective at removing
- * additional cells. It typically removes 10-20 cells depending on the
- * board configuration.
+ * Phase 2 exploits a key insight: if a number can ONLY go in its current
+ * position within its constraint regions (row, column, subgrid), then
+ * removing it cannot introduce multiple solutions. The solver will be
+ * forced to place that exact number there.
  * 
- * Algorithm:
- * 1. For each subgrid (in shuffled order for randomness):
- *    - Check each filled cell in the subgrid
- *    - Use hasAlternative() to determine if number has other valid positions
- *    - If no alternatives, remove the cell (it's locked to this position)
- *    - Remove at most one cell per subgrid per round to avoid cascade effects
- * 2. Could be repeated iteratively until no more removals possible, but
- *    current implementation does single pass for efficiency
+ * This is called "naked single elimination" in Sudoku solving terminology.
  * 
- * @param[in,out] board Board with Phase 1 eliminations applied
- * @param[in] index Array of subgrid indices defining processing order
- * @param[in] count Number of subgrids to process (typically 9)
- * @return Number of cells successfully removed (typically 10-20)
+ * ADAPTATIONS FOR CONFIGURABLE SIZES:
+ * - All loop bounds use board_size instead of SUDOKU_SIZE (9)
+ * - Subgrid iteration works for any perfect square board
  * 
- * @pre board != NULL && index != NULL
- * @pre board contains valid partially-filled Sudoku (post-Phase 1)
- * @post Additional cells removed where numbers had no alternatives
- * @post Board still has at least one solution (removing locked numbers
- *       maintains solvability)
+ * TIME COMPLEXITY ANALYSIS:
  * 
- * @note Time complexity: O(n³) in worst case (n² cells × n checks each)
- * @note Could be made iterative (repeat until no more removals) for
- *       more aggressive elimination, at cost of increased runtime
+ * For an N×N board with √N×√N subgrids:
+ * - Outer loop: N subgrids (technically (N/√N)² = N subgrids)
+ * - Inner loop: N cells per subgrid
+ * - hasAlternative: O(3N) worst case = O(N)
+ * - Total per round: O(N × N × N) = O(N³)
+ * 
+ * Typical rounds: 3-5 before convergence
+ * Total Phase 2: O(5 × N³) = O(N³)
+ * 
+ * @param board Board with partially filled solution
+ * @param index Array of subgrid indices to process
+ * @param count Number of subgrids to process
+ * @return Number of cells removed in this round
+ * 
+ * @note This function should be called in a loop until it returns 0
  */
 int phase2Elimination(SudokuBoard *board, const int *index, int count) {
-    // ✅ EVENTO: Inicio de Phase 2
+    // Emit phase 2 start event
     emit_event(SUDOKU_EVENT_PHASE2_START, board, 2, 0);
-
+    
+    // ✅ ADAPTACIÓN: Obtener tamaño dinámico del tablero
+    int board_size = sudoku_board_get_board_size(board);
+    
     int removed = 0;
     
-    // Process each subgrid in shuffled order
+    // Process each subgrid in the order specified
     for (int idx = 0; idx < count; idx++) {
-        SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx]);
+        SudokuSubGrid subgrid = sudoku_subgrid_create(index[idx], board->subgrid_size);
         
-        // Check each cell in this subgrid
-        for (int cell_idx = 0; cell_idx < SUDOKU_SIZE; cell_idx++) {
+        // ✅ ADAPTACIÓN: Usar board_size para iterar sobre celdas de subcuadrícula
+        // RAZONAMIENTO: Cada subcuadrícula contiene board_size celdas
+        // Para 9×9: 9 celdas por subcuadrícula (3×3)
+        // Para 16×16: 16 celdas por subcuadrícula (4×4)
+        for (int cell_idx = 0; cell_idx < board_size; cell_idx++) {
             SudokuPosition pos = sudoku_subgrid_get_position(&subgrid, cell_idx);
             
-            // Only consider filled cells
+            // Only process filled cells
             if (board->cells[pos.row][pos.col] != 0) {
                 int num = board->cells[pos.row][pos.col];
                 
-                // Check if this number has any alternative valid positions
+                // Check if this number has NO alternatives
                 if (!hasAlternative(board, &pos, num)) {
-                    // No alternatives means it's locked to this position
-                    // Safe to remove without creating ambiguity
+                    // Safe to remove: number can only go here
+                    int removed_value = board->cells[pos.row][pos.col];
                     board->cells[pos.row][pos.col] = 0;
                     removed++;
                     
-                    // ✅ EVENTO: Celda removida en Phase 2
-                    emit_event_cell(SUDOKU_EVENT_PHASE2_CELL_SELECTED,
-                                    board,
-                                    2,           // phase_number
-                                    removed,     // cells_removed_total
-                                    pos.row,     // row
-                                    pos.col,     // col
-                                    num);        // value
-
-                    break;  // Only one removal per subgrid per round
+                    // Emit cell selected event
+                    emit_event_cell(SUDOKU_EVENT_PHASE2_CELL_SELECTED, board, 2,
+                                    removed, pos.row, pos.col, removed_value);
+                    
+                    // Only remove one per subgrid per round
+                    // This prevents over-aggressive elimination
+                    break;
                 }
             }
         }
     }
     
-    // ✅ EVENTO: Phase 2 completada
+    // Emit phase 2 complete event
     emit_event(SUDOKU_EVENT_PHASE2_COMPLETE, board, 2, removed);
-
+    
     return removed;
 }
+
+/**
+ * EDUCATIONAL NOTES ON PHASE 2 ADAPTATIONS:
+ * 
+ * 1. WHY THE ALGORITHM ITSELF DOESN'T CHANGE:
+ *    
+ *    The core logic of Phase 2 is size-agnostic:
+ *    "Remove cells whose numbers have no alternative positions"
+ *    
+ *    This statement is true for 4×4, 9×9, 16×16, and any other size.
+ *    The only changes needed are:
+ *    - Loop bounds: 9 → board_size
+ *    - Subgrid calculations: 3 → subgrid_size
+ * 
+ * 2. HOW DOES PHASE 2 SCALE WITH BOARD SIZE?
+ *    
+ *    For a 9×9 board:
+ *    - 9 subgrids to process
+ *    - Each has ~9 filled cells after Phase 1
+ *    - hasAlternative() checks ~27 cells worst case
+ *    - Total: 9 × 9 × 27 = 2,187 cell checks
+ *    
+ *    For a 16×16 board:
+ *    - 16 subgrids to process
+ *    - Each has ~16 filled cells after Phase 1
+ *    - hasAlternative() checks ~48 cells worst case (16+16+16)
+ *    - Total: 16 × 16 × 48 = 12,288 cell checks
+ *    
+ *    Scaling factor: approximately N³ where N = board_size
+ *    This is acceptable because early exit optimizations reduce
+ *    actual work significantly below worst-case bounds.
+ * 
+ * 3. WHY IS THE MODULO OPERATION CORRECT?
+ *    
+ *    The expression `pos->row - (pos->row % subgrid_size)` computes
+ *    integer division and floors to the nearest subgrid boundary.
+ *    
+ *    Mathematical proof:
+ *    Let r = pos->row, k = subgrid_size
+ *    Define q = floor(r / k), the subgrid index
+ *    Then r = q×k + (r % k) by definition of modulo
+ *    So r - (r % k) = q×k, which is the start of subgrid q
+ *    
+ *    Example: row=7, subgrid_size=3
+ *    7 % 3 = 1, so 7-1 = 6 (start of third subgrid)
+ *    Check: floor(7/3) = 2, and 2×3 = 6 ✓
+ * 
+ * 4. WHY DOES hasAlternative() RESTORE THE CELL?
+ *    
+ *    We temporarily set the cell to 0 to ask: "if this cell were empty,
+ *    could the number go somewhere else?" This requires making the cell
+ *    appear empty during the isSafePosition() checks.
+ *    
+ *    However, we must restore it because:
+ *    a) We haven't decided to remove it yet (only checking)
+ *    b) Other iterations need to see the original board state
+ *    c) Forgetting to restore causes board corruption
+ *    
+ *    This pattern (modify, test, restore) is common in backtracking
+ *    and heuristic search algorithms.
+ */

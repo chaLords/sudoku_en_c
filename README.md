@@ -1,12 +1,12 @@
+=== INICIO README.md ===
 # 🎮 Sudoku Generator Library
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![C](https://img.shields.io/badge/C-00599C?style=flat&logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
-[![Version](https://img.shields.io/badge/version-2.2.2-brightgreen.svg)](https://github.com/chaLords/sudoku_en_c/releases)
+[![Version](https://img.shields.io/badge/version-2.3.0-brightgreen.svg)](https://github.com/chaLords/sudoku_en_c/releases)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](https://github.com/chaLords/sudoku_en_c)
 
 > Biblioteca profesional en C para generación de puzzles Sudoku con solución única garantizada. Arquitectura modular, API limpia, y algoritmo híbrido Fisher-Yates + Backtracking optimizado.
-
 ```
 ┌───────┬───────┬───────┐
 │ . 4 . │ . 3 . │ 7 . . │
@@ -27,7 +27,7 @@
 
 ## ✨ Características Principales
 
-- **🎯 Alta Tasa de Éxito**: ~99.9% en primer intento
+- **🎯 Alta Tasa de Éxito**: ~99.9% en 9×9, ~99% en 4×4 (mejorado en v2.3.0)
 - **✓ Solución Única Garantizada**: Verificación exhaustiva con early-exit
 - **⚡ Rápido**: Generación típica <10ms
 - **🎲 Uniformemente Aleatorio**: Fisher-Yates para distribución uniforme
@@ -39,8 +39,13 @@
 
 ---
 
-## 🚀 Quick Start
+## 🆕 Novedades en v2.3.0
 
+La versión 2.3.0 introduce **Phase 2C**, una refactorización completa del sistema de eliminación con mecanismo inteligente de reintentos. Las mejoras clave incluyen un aumento dramático en la tasa de éxito para tableros 4×4 (de 30% a 99%) mediante lógica adaptativa de reintentos, separación modular clara entre Phase 2A (eliminación estratégica), Phase 2B (bucle de reintentos), y Phase 2C (sistema integrado), además de cobertura de pruebas completa con más de 55 tests unitarios que validan el comportamiento correcto en diferentes tamaños de tablero y casos límite.
+
+---
+
+## 🚀 Quick Start
 ```bash
 # Clonar repositorio
 git clone https://github.com/chaLords/sudoku_en_c.git
@@ -54,7 +59,6 @@ make
 ```
 
 ### Usar como Biblioteca
-
 ```c
 #include <sudoku/sudoku.h>
 #include <stdio.h>
@@ -75,7 +79,6 @@ int main(void) {
     return 0;
 }
 ```
-
 ```bash
 gcc mi_programa.c -I include -L lib -lsudoku_core -o mi_programa
 ./mi_programa
@@ -92,7 +95,6 @@ gcc mi_programa.c -I include -L lib -lsudoku_core -o mi_programa
 - Git
 
 ### Opción 1: Make (Recomendado)
-
 ```bash
 # Compilar biblioteca y CLI
 make
@@ -116,7 +118,6 @@ Esto genera:
 - Headers en `include/sudoku/`
 
 ### Opción 2: CMake
-
 ```bash
 mkdir build && cd build
 cmake ..
@@ -125,7 +126,6 @@ sudo make install  # Opcional
 ```
 
 ### Opción 3: Compilación Manual
-
 ```bash
 # Compilar biblioteca
 gcc -c -I include src/core/*.c src/core/*/*.c
@@ -140,7 +140,6 @@ gcc -I include tools/generator_cli/main.c -L. -lsudoku -o sudoku
 ## 📖 Uso Básico
 
 ### CLI - Modos de Verbosidad
-
 ```bash
 # Modo 0: Minimal (solo resultado)
 ./sudoku_generator 0
@@ -156,7 +155,6 @@ gcc -I include tools/generator_cli/main.c -L. -lsudoku -o sudoku
 ### API - Funciones Principales
 
 #### Generar Puzzle
-
 ```c
 SudokuBoard board;
 SudokuGenerationStats stats;
@@ -168,7 +166,6 @@ if (sudoku_generate(&board, &stats)) {
 ```
 
 #### Validar Puzzle
-
 ```c
 if (sudoku_validate_board(&board)) {
     printf("✓ Puzzle válido\n");
@@ -176,7 +173,6 @@ if (sudoku_validate_board(&board)) {
 ```
 
 #### Verificar Solución Única
-
 ```c
 int solutions = countSolutionsExact(&board, 2);
 if (solutions == 1) {
@@ -185,7 +181,6 @@ if (solutions == 1) {
 ```
 
 #### Configurar Verbosidad
-
 ```c
 sudoku_set_verbosity(1);  // 0=minimal, 1=compact, 2=detailed
 ```
@@ -195,16 +190,15 @@ sudoku_set_verbosity(1);  // 0=minimal, 1=compact, 2=detailed
 ---
 
 ## 🏗️ Estructura del Proyecto
-
 ```
 sudoku_en_c/
 ├── include/sudoku/       # 🔓 API Pública
 │   └── core/             # Headers públicos (types, generator, validation, board, display)
 ├── src/core/             # 🔒 Implementación
 │   ├── algorithms/       # Backtracking, Fisher-Yates
-│   ├── elimination/      # Sistema de 3 fases
+│   ├── elimination/      # Sistema de 3 fases (Phase 2C)
 │   └── internal/         # Headers privados
-├── tests/unit/           # ✅ Tests por módulo
+├── tests/unit/           # ✅ Tests por módulo (55+ tests)
 ├── tools/                # 🛠️ CLI y utilidades
 └── docs/                 # 📚 Documentación técnica
 ```
@@ -224,6 +218,7 @@ sudoku_en_c/
 3. **3-Phase Elimination**:
    - **Phase 1**: Random selection (1 por subgrid)
    - **Phase 2**: No-alternatives elimination (iterativo)
+   - **Phase 2C**: Mecanismo de reintentos con lógica adaptativa (nuevo en v2.3.0)
    - **Phase 3**: Free elimination con verificación de unicidad
 
 ### Características Técnicas
@@ -232,6 +227,7 @@ sudoku_en_c/
 - **Optimizaciones**: Early-exit, poda inteligente, randomización
 - **Verificación**: Conteo exhaustivo con límite configurable
 - **Distribución**: Uniformemente aleatoria gracias a Fisher-Yates
+- **Fiabilidad**: Reintentos adaptativos para tableros pequeños (4×4)
 
 📖 **Análisis matemático**: Ver [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 
@@ -239,17 +235,22 @@ sudoku_en_c/
 
 ## 🗺️ Roadmap
 
-### ✅ v2.2.2 (Actual - Noviembre 2025)
+### ✅ v2.3.0 (Actual - Enero 2025)
 - Modularización completa
+- Phase 2C con mecanismo de reintentos
+- 55+ tests unitarios
+- 99% de éxito en tableros 4×4
+
+### ✅ v2.2.2 (Noviembre 2024)
 - API pública estable (`include/sudoku/`)
 - Arquitectura preparada para v3.0
 
-### 🚧 v2.3 (Q1 2025)
-- Tests unitarios completos
+### 🚧 v2.4 (Q2 2025)
+- Cobertura completa de tests unitarios
 - Sistema de configuración flexible
 - Export/import de puzzles
 
-### 🔮 v3.0 (Q2 2025)
+### 🔮 v3.0 (Q3 2025)
 - Soporte multi-tamaño (4x4, 16x16, 25x25)
 - Punteros opacos
 - Memoria dinámica
@@ -319,3 +320,4 @@ Licensed under Apache License 2.0
 ## 🌐 Otros Idiomas
 
 - [English](README.en.md)
+=== FIN README.md ===
