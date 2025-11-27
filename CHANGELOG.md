@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [3.0.0] - 2025-Q2 (Planificado)
+
+### 🚀 Nueva Arquitectura Universal
+Ver documentación técnica completa en [docs/ALGORITHM_V3.md](docs/ALGORITHM_V3.md)
+
+- Soporte para tableros 4×4, 9×9, 16×16, 25×25, 36×36, 49×49
+- Algoritmo híbrido: Fisher-Yates + AC3HB + Backtracking por densidad
+- Estructuras de datos dinámicas para tamaños variables
+- Límite práctico: 49×49 (~1 hora)
+- Límite experimental: 100×100 (solo cuadrados perfectos)
 
 ## [Unreleased]
 

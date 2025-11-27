@@ -335,8 +335,8 @@ typedef struct {
 typedef struct {
     int index;              ///< Subgrid index (0 to board_size-1)
     SudokuPosition base;    ///< Top-left corner position of this subgrid
-    int subgrid_size;       ///< Size of this subgrid (k in k×k), needed for position calculations
 } SudokuSubGrid;
+
 // ═══════════════════════════════════════════════════════════════════
 //                    GENERATION STATISTICS
 // ═══════════════════════════════════════════════════════════════════
@@ -417,6 +417,17 @@ typedef struct {
      * a difficult configuration and had to restart.
      */
     int total_attempts;
+
+    // 🆕 NEW: AC-3 metrics
+    int ac3_revisions;          ///< Number of arc revisions
+    int ac3_propagations;       ///< Constraint propagations
+    int ac3_values_removed;     ///< Values eliminated by AC-3
+    double ac3_time_ms;         ///< Time spent in AC-3
+    
+    // 🆕 NEW: Heuristic metrics  
+    int heuristic_calls;        ///< Variable selections
+    double heuristic_time_ms;   ///< Time spent in heuristics
+
 } SudokuGenerationStats;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -515,7 +526,19 @@ typedef enum {
     SUDOKU_EVENT_PHASE3_CELL_TESTING,     /**< Testing if cell can be removed */
     SUDOKU_EVENT_PHASE3_CELL_REMOVED,     /**< Cell successfully removed */
     SUDOKU_EVENT_PHASE3_CELL_KEPT,        /**< Cell kept (removal breaks uniqueness) */
-    SUDOKU_EVENT_PHASE3_COMPLETE          /**< Phase 3 finished */
+    SUDOKU_EVENT_PHASE3_COMPLETE,         /**< Phase 3 finished */
+
+    // ─────────────────────────────────────────────────────────────
+    //  NEW: AC-3 events    
+    // ─────────────────────────────────────────────────────────────
+    SUDOKU_EVENT_AC3_START,           ///< AC-3 propagation started
+    SUDOKU_EVENT_AC3_REVISION,        ///< Arc revised
+    SUDOKU_EVENT_AC3_VALUE_REMOVED,   ///< Value eliminated
+    SUDOKU_EVENT_AC3_COMPLETE,        ///< AC-3 finished
+    SUDOKU_EVENT_AC3_DEADEND,         ///< Inconsistency detected
+    // 🆕 NEW: Heuristic events
+    SUDOKU_EVENT_HEURISTIC_SELECT,    ///< Cell selected by heuristic
+
 } SudokuEventType;
 
 /**
@@ -613,33 +636,36 @@ typedef void (*SudokuEventCallback)(const SudokuEventData *event, void *user_dat
  * sudoku_generate_ex(&board, &config, &stats);
  * @endcode
  */
+// ═══════════════════════════════════════════════════════════════
+// 🚧 STUB: Heuristic Strategy (v3.0 AC3HB - NOT YET IMPLEMENTED)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @brief Heuristic strategies for backtracking (AC3HB algorithm)
+ * 
+ * ⚠️ STUB IMPLEMENTATION - v3.0 AC3HB Feature
+ * 
+ * This enum will be fully implemented when AC3HB is added.
+ * Currently, only HEURISTIC_NONE is available (classic backtracking).
+ */
+typedef enum {
+    HEURISTIC_NONE = 0  ///< No heuristics (classic backtracking) - DEFAULT
+    
+    // TODO v3.0: Add these when implementing AC3HB:
+    // HEURISTIC_MRV = 1,      ///< Minimum Remaining Values
+    // HEURISTIC_LCV = 2,      ///< Least Constraining Value  
+    // HEURISTIC_DEGREE = 3,   ///< Degree heuristic
+    // HEURISTIC_COMBINED = 4  ///< Use all heuristics
+} HeuristicStrategy;
+
+// Ahora define SudokuGenerationConfig (tu código existente)
 typedef struct {
-    /**
-     * @brief Optional callback function for progress monitoring
-     * 
-     * Set to NULL to disable event notifications.
-     * When set, the function is called for each generation event.
-     */
     SudokuEventCallback callback;
-    
-    /**
-     * @brief Custom data passed to callback function
-     * 
-     * Can be NULL. This pointer is passed unchanged to every
-     * callback invocation, allowing the callback to access
-     * application-specific context.
-     */
     void *user_data;
-    
-    /**
-     * @brief Maximum generation attempts before giving up
-     * 
-     * If generation fails (extremely rare), the generator will
-     * retry up to this many times before returning failure.
-     * 
-     * Set to 0 to use the default value (typically 5).
-     */
     int max_attempts;
+    bool use_ac3;
+    bool use_heuristics;
+    HeuristicStrategy heuristic_strategy;  // ✅ Ahora compila
 } SudokuGenerationConfig;
 
 #endif // SUDOKU_TYPES_H

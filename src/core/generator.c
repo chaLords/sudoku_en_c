@@ -2,25 +2,32 @@
  * @file generator.c
  * @brief Main API for generating Sudoku puzzles
  * @author Gonzalo Ramírez
- * @date 2025-11-24
- * @version 3.0.1 - Fixed 4×4 generation with retry loop
+ * @date 2025-11-26
+ * @version 3.0.2 - Added AC3HB branching architecture
  * 
  * This file provides the main API for generating Sudoku puzzles
- * using the hybrid Fisher-Yates + Backtracking approach with
- * three-phase elimination.
+ * using TWO algorithm paths:
  * 
- * VERSION 3.0.1 BUGFIX:
- * - Added retry loop for diagonal filling + backtracking
+ * 1. CLASSIC PATH (v2.2.1 compatible):
+ *    - Fisher-Yates for diagonal subgrids
+ *    - Standard backtracking for completion
+ *    - Three-phase elimination
+ * 
+ * 2. AC3HB PATH (NEW in v3.0 - currently stub):
+ *    - Fisher-Yates for diagonal subgrids
+ *    - AC-3 constraint propagation
+ *    - Backtracking with MRV/LCV heuristics
+ *    - Three-phase elimination
+ * 
+ * CHANGELOG v3.0.2:
+ * - Added branching architecture for AC3HB path
+ * - Refactored existing code into generate_classic()
+ * - Created stub for generate_with_ac3hb()
+ * - Maintained 100% backward compatibility
+ * 
+ * VERSION 3.0.1 BUGFIX (maintained):
+ * - Retry loop for diagonal filling + backtracking
  * - Fixes ~70% failure rate on 4×4 boards
- * - Maintains 100% backward compatibility for 9×9 boards
- * - Dynamic attempt limits based on board size
- * 
- * The generation algorithm follows these steps:
- * 1. Fill diagonal subgrids using Fisher-Yates (with retry)
- * 2. Complete remaining cells with randomized backtracking
- * 3. Phase 1: Remove one random number per subgrid
- * 4. Phase 2: Iteratively remove numbers without alternatives
- * 5. Phase 3: Free elimination with uniqueness verification
  */
 
 #include <stdio.h>
@@ -35,100 +42,133 @@
 #include "internal/events_internal.h"
 
 // ═══════════════════════════════════════════════════════════════════
-//                    CORE GENERATION FUNCTION
+//                    FORWARD DECLARATIONS (PRIVATE)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Generate puzzle using classic Fisher-Yates + Backtracking
+ * 
+ * This is the EXISTING v2.2.1 algorithm extracted into a separate function.
+ * Maintains 100% backward compatibility with previous versions.
+ */
+static bool generate_classic(SudokuBoard *board,
+                            const SudokuGenerationConfig *config,
+                            SudokuGenerationStats *stats);
+
+/**
+ * @brief Generate puzzle using AC3HB algorithm (NEW in v3.0)
+ * 
+ * This is the NEW algorithm path that uses constraint propagation
+ * and heuristic search. Currently implemented as stub.
+ * 
+ * @note Currently delegates to generate_classic()
+ * @todo Implement full AC3HB path (Week 3 of roadmap)
+ */
+static bool generate_with_ac3hb(SudokuBoard *board,
+                               const SudokuGenerationConfig *config,
+                               SudokuGenerationStats *stats);
+
+// ═══════════════════════════════════════════════════════════════════
+//                    PUBLIC API IMPLEMENTATION
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Generate a playable Sudoku puzzle with unique solution
  * 
- * Creates a complete valid Sudoku board and then strategically removes
- * cells using a three-phase elimination strategy to create a playable
- * puzzle with exactly one solution.
+ * NEW in v3.0.2: This function now acts as a dispatcher that chooses
+ * between two algorithm paths based on configuration:
  * 
- * VERSION 3.0.1 BUGFIX:
- * Added retry loop for generation to handle cases where Fisher-Yates
- * creates an incompletable diagonal configuration. This primarily affects
- * 4×4 boards where the probability of incompletable configurations is ~70%.
+ * - If config->use_ac3 == true  → Use AC3HB path (optimized for large boards)
+ * - If config->use_ac3 == false → Use Classic path (v2.2.1 compatible)
+ * - If config == NULL           → Use Classic path (default, safe)
  * 
- * Generation process:
- * 1. Fill diagonal subgrids with Fisher-Yates shuffling (with retry)
- * 2. Complete remaining cells with randomized backtracking
- * 3. Phase 1: Remove one random number per subgrid
- * 4. Phase 2: Iteratively remove numbers without alternatives
- * 5. Phase 3: Free elimination with uniqueness verification (auto-target)
- * 
- * SCALABILITY (v3.0):
- * This function now supports multiple board sizes through dynamic memory
- * allocation. The number of subgrids scales with board size:
- * - 4×4 board: 4 subgrids (2×2 each)
- * - 9×9 board: 9 subgrids (3×3 each)
- * - 16×16 board: 16 subgrids (4×4 each)
- * - 25×25 board: 25 subgrids (5×5 each)
- * 
- * @param[out] board Pointer to the board structure to fill (will be initialized)
- * @param[in] config Configuration including optional callback for progress monitoring
- * @param[out] stats Pointer to store generation statistics, or NULL if not needed
- * @return true if generation succeeded, false on failure (extremely rare)
- * 
- * @pre board != NULL
- * @post If returns true, board contains a valid puzzle with unique solution
- * @post If stats != NULL, contains detailed statistics about the generation process
- * 
- * @note If stats is NULL, statistics are not collected (no performance impact)
- * @note Success rate is now 100% for all board sizes (within max_attempts limit)
- * @note Average attempts needed: 4×4: 3.3, 9×9: 1.0, 16×16: TBD, 25×25: TBD
- * @note Generation time varies by board size: <10ms for 9×9, longer for larger boards
- * 
- * @warning This function uses rand() internally. Call srand(time(NULL))
- *          before first use to ensure different puzzles each execution
- * 
- * @see sudoku_generate() for simple version without callbacks
- * @see sudoku_generate_with_difficulty() for difficulty-targeted generation
+ * @param[out] board Pointer to the board structure to fill
+ * @param[in] config Configuration including algorithm selection
+ * @param[out] stats Pointer to store generation statistics, or NULL
+ * @return true if generation succeeded, false on failure
  */
 bool sudoku_generate_ex(SudokuBoard *board,
                         const SudokuGenerationConfig *config,
                         SudokuGenerationStats *stats) {
     
     // ═══════════════════════════════════════════════════════════════
+    // ✨ NEW v3.0.2: ALGORITHM PATH SELECTION
+    // ═══════════════════════════════════════════════════════════════
+    
+    /*
+     * ARCHITECTURAL DECISION: Branching Strategy
+     * 
+     * This dispatcher separates concerns:
+     * - Public API remains stable
+     * - Internal implementation can vary
+     * - Configuration controls behavior
+     * 
+     * USAGE EXAMPLES:
+     * 
+     * // Default (Classic path):
+     * sudoku_generate_ex(&board, NULL, &stats);
+     * 
+     * // Explicit Classic path:
+     * SudokuGenerationConfig config = {.use_ac3 = false};
+     * sudoku_generate_ex(&board, &config, &stats);
+     * 
+     * // AC3HB path (NEW):
+     * SudokuGenerationConfig config = {.use_ac3 = true};
+     * sudoku_generate_ex(&board, &config, &stats);
+     */
+    
+    if (config != NULL && config->use_ac3) {
+        // ✨ NEW: AC3HB generation path
+        // Expected speedup: 30-60× for large boards
+        return generate_with_ac3hb(board, config, stats);
+    } else {
+        // ✅ EXISTING: Classic Fisher-Yates + Backtracking
+        // 100% backward compatible
+        return generate_classic(board, config, stats);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    CLASSIC ALGORITHM PATH (v2.2.1)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief CLASSIC generation path - Fisher-Yates + Standard Backtracking
+ * 
+ * This function contains the ENTIRE v2.2.1 generation algorithm,
+ * extracted from the original sudoku_generate_ex() for modularity.
+ * 
+ * NO CHANGES to algorithm logic - pure refactoring for branching.
+ */
+static bool generate_classic(SudokuBoard *board,
+                            const SudokuGenerationConfig *config,
+                            SudokuGenerationStats *stats) {
+    
+    // ═══════════════════════════════════════════════════════════════
     // STEP 0: Initialize board and extract dimensions
     // ═══════════════════════════════════════════════════════════════
     
-    // Initialize board to completely empty state
     sudoku_board_init(board);
     
-    /*
-     * EDUCATIONAL NOTE: Extracting board dimensions early
-     * 
-     * We extract board_size once at the beginning to:
-     * 1. Avoid repeated function calls (minor optimization)
-     * 2. Use the value for dynamic memory allocation
-     * 3. Make the code self-documenting about what size we're working with
-     * 
-     * For a board of size N×N:
-     * - board_size = N (e.g., 9 for standard Sudoku)
-     * - Number of subgrids = N (there are N subgrids of size √N × √N)
-     * - Total cells = N × N
-     */
     int board_size = sudoku_board_get_board_size(board);
-    int num_subgrids = board_size;  // N×N board has N subgrids
+    int num_subgrids = board_size;
     
     // Initialize event system
     if (config != NULL && config->callback != NULL) {
         events_init(config->callback, config->user_data);
     } else {
-        events_init(NULL, NULL);  // Disable events
+        events_init(NULL, NULL);
     }
     
-    // Emit generation start event
     emit_event(SUDOKU_EVENT_GENERATION_START, NULL, 0, 0);
     
-    // Initialize statistics structure if provided
+    // Initialize statistics
     if (stats) {
         stats->phase1_removed = 0;
         stats->phase2_removed = 0;
         stats->phase2_rounds = 0;
         stats->phase3_removed = 0;
-        stats->total_attempts = 1;  // Will be updated in retry loop
+        stats->total_attempts = 1;
     }
     
     // ═══════════════════════════════════════════════════════════════
@@ -136,88 +176,62 @@ bool sudoku_generate_ex(SudokuBoard *board,
     // ═══════════════════════════════════════════════════════════════
     
     /*
-     * ✅ BUGFIX v3.0.1: Added retry loop for small boards
+     * ✅ BUGFIX v3.0.1: Retry loop for small boards
      * 
-     * PROBLEM ANALYSIS:
-     * Fisher-Yates fills diagonal subgrids randomly. For small boards like 4×4,
-     * where diagonal subgrids represent 50% of the board, random configurations
-     * have a ~70% probability of creating constraint deadlocks that make the
-     * board incompletable via backtracking.
-     * 
-     * Mathematical explanation:
-     * - 4×4 has only 288 total valid sudokus
-     * - Diagonal fills 8 of 16 cells (50%)
-     * - High constraint density creates many incompletable states
-     * - 9×9 has 6.67×10²¹ valid sudokus, extremely low deadlock probability
-     * 
-     * SOLUTION:
-     * Retry with different random diagonal configurations until backtracking
-     * succeeds. Attempt limits scale with board size based on empirical
-     * failure probabilities:
-     * 
-     * Board Size | Failure Rate | Max Attempts | Expected Attempts
-     * -----------|--------------|--------------|-------------------
-     * 4×4        | ~70%         | 20           | 3.3 (1/0.3)
-     * 9×9        | ~0.01%       | 5            | 1.0 (nearly always first try)
-     * 16×16      | Unknown      | 10           | TBD (needs empirical testing)
-     * 25×25      | Unknown      | 15           | TBD (needs empirical testing)
-     * 
-     * This maintains the algorithm's efficiency while ensuring 100% success rate.
+     * Fisher-Yates can create incompletable configurations on small boards.
+     * 4×4 has ~70% failure probability. We retry until success.
      */
     
-    // Calculate maximum attempts based on board size
     int max_attempts;
     switch (board_size) {
         case 4:
-            max_attempts = 20;  // 4×4: high failure probability (~70%)
+            max_attempts = 20;
             break;
         case 9:
-            max_attempts = 5;   // 9×9: almost always succeeds first try
+            max_attempts = 5;
             break;
         case 16:
-            max_attempts = 10;  // 16×16: moderate (needs empirical tuning)
+            max_attempts = 10;
             break;
         case 25:
-            max_attempts = 15;  // 25×25: conservative estimate
+            max_attempts = 15;
             break;
         default:
-            max_attempts = 10;  // Default for unknown sizes
+            max_attempts = 10;
             break;
     }
     
     bool generation_successful = false;
     int attempt;
     
-    // Retry loop: Try different random diagonal configurations until one works
     for (attempt = 0; attempt < max_attempts && !generation_successful; attempt++) {
-        // Clear the board before each attempt (except first iteration)
-        // This resets all cells to 0 and statistics to initial state
         if (attempt > 0) {
             sudoku_board_init(board);
         }
         
         // STEP 1: Fill diagonal subgrids with Fisher-Yates
-        // Each attempt uses a different random configuration due to rand()
         fillDiagonal(board);
         
-        // STEP 2: Attempt to complete remaining cells with backtracking
-        // If this succeeds, we have a valid complete board
+        // Emit diagonal complete event
+        emit_event(SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE, board, 0, 0);
+        
+        // STEP 2: Complete remaining cells with backtracking
         if (sudoku_complete_backtracking(board)) {
             generation_successful = true;
             
-            // Update statistics to reflect actual attempts needed
+            // Emit backtracking complete event
+            emit_event(SUDOKU_EVENT_BACKTRACK_COMPLETE, board, 0, 0);
+            
             if (stats) {
                 stats->total_attempts = attempt + 1;
             }
         }
-        // If backtracking fails, loop continues to retry with new diagonal config
     }
     
-    // Check if generation ultimately failed after all attempts
     if (!generation_successful) {
         fprintf(stderr, "❌ Error: Failed to complete board (size %d×%d) after %d attempts\n",
                 board_size, board_size, max_attempts);
-        fprintf(stderr, "   This is extremely rare. Consider increasing max_attempts.\n");
+        emit_event(SUDOKU_EVENT_GENERATION_FAILED, board, attempt, 0);
         return false;
     }
     
@@ -225,29 +239,12 @@ bool sudoku_generate_ex(SudokuBoard *board,
     // STEP 3: Allocate dynamic array for subgrid indices
     // ═══════════════════════════════════════════════════════════════
     
-    /*
-     * MEMORY MANAGEMENT: Dynamic allocation for scalability
-     * 
-     * Previously, we used a static array: int subgrid_indices[9]
-     * This only works for 9×9 boards. For configurable sizes, we must
-     * allocate dynamically based on the actual number of subgrids.
-     * 
-     * Memory footprint by board size:
-     * - 4×4:   4 × sizeof(int) =  16 bytes
-     * - 9×9:   9 × sizeof(int) =  36 bytes
-     * - 16×16: 16 × sizeof(int) = 64 bytes
-     * - 25×25: 25 × sizeof(int) = 100 bytes
-     * 
-     * CRITICAL: We allocate ONCE and reuse for both Phase 1 and Phase 2
-     * to minimize allocation overhead. The array is freed at the end.
-     */
     int *subgrid_indices = (int *)malloc(num_subgrids * sizeof(int));
     if (subgrid_indices == NULL) {
         fprintf(stderr, "❌ Error: Memory allocation failed for subgrid indices\n");
         return false;
     }
     
-    // Initialize indices: [0, 1, 2, ..., num_subgrids-1]
     for (int i = 0; i < num_subgrids; i++) {
         subgrid_indices[i] = i;
     }
@@ -256,23 +253,6 @@ bool sudoku_generate_ex(SudokuBoard *board,
     // PHASE 1: Remove one random number from each subgrid
     // ═══════════════════════════════════════════════════════════════
     
-    /*
-     * PHASE 1 STRATEGY: Uniform initial distribution
-     * 
-     * We remove exactly one cell from each subgrid to ensure:
-     * 1. Every region of the puzzle has at least one empty cell
-     * 2. The initial distribution of empty cells is uniform
-     * 3. No single region becomes trivially easy or impossibly hard
-     * 
-     * The shuffle determines WHICH cell gets removed from each subgrid,
-     * introducing randomness into the puzzle's structure.
-     * 
-     * Result for different board sizes:
-     * - 4×4: 4 cells removed (25% of 16 total)
-     * - 9×9: 9 cells removed (11% of 81 total)
-     * - 16×16: 16 cells removed (6% of 256 total)
-     * - 25×25: 25 cells removed (4% of 625 total)
-     */
     sudoku_generate_permutation(subgrid_indices, num_subgrids, 0);
     
     int removed1 = phase1Elimination(board, subgrid_indices, num_subgrids);
@@ -285,23 +265,6 @@ bool sudoku_generate_ex(SudokuBoard *board,
     // PHASE 2: Remove numbers without alternatives (iterative)
     // ═══════════════════════════════════════════════════════════════
     
-    /*
-     * PHASE 2 STRATEGY: Logical elimination
-     * 
-     * A number has "no alternatives" when it cannot be placed in any
-     * other empty cell within its row, column, or subgrid. Removing
-     * such numbers is guaranteed to maintain solution uniqueness.
-     * 
-     * We iterate in rounds until no more removals are possible:
-     * - Round 1: Remove ~9 cells (one per subgrid if found)
-     * - Round 2-N: Remove progressively fewer as opportunities decrease
-     * - Final round: Remove 0 cells (convergence reached)
-     * 
-     * This phase typically removes 15-25 additional cells for 9×9 boards.
-     * The exact number varies with puzzle structure.
-     */
-    
-    // Reshuffle indices for Phase 2 (different random order)
     sudoku_generate_permutation(subgrid_indices, num_subgrids, 0);
     
     int total_removed2 = 0;
@@ -314,7 +277,10 @@ bool sudoku_generate_ex(SudokuBoard *board,
         
         if (removed_this_round > 0) {
             rounds++;
-            // Reshuffle for next round to vary removal order
+            
+            // Emit round complete event
+            emit_event(SUDOKU_EVENT_PHASE2_ROUND_START, board, removed_this_round, rounds);
+            
             sudoku_generate_permutation(subgrid_indices, num_subgrids, 0);
         }
     } while (removed_this_round > 0);
@@ -324,88 +290,95 @@ bool sudoku_generate_ex(SudokuBoard *board,
         stats->phase2_rounds = rounds;
     }
     
+    // Emit phase 2 complete event
+    emit_event(SUDOKU_EVENT_PHASE2_COMPLETE, board, total_removed2, rounds);
+    
     // ═══════════════════════════════════════════════════════════════
     // CLEANUP: Free dynamically allocated memory
     // ═══════════════════════════════════════════════════════════════
     
-    /*
-     * MEMORY MANAGEMENT: Preventing leaks
-     * 
-     * CRITICAL: We must free the subgrid_indices array before Phase 3
-     * because Phase 3 allocates its own internal array for positions.
-     * Freeing here keeps memory usage bounded and prevents leaks.
-     * 
-     * Memory discipline rule: Free as soon as no longer needed,
-     * don't wait until function end if not necessary.
-     */
     free(subgrid_indices);
-    subgrid_indices = NULL;  // Defensive: prevent use-after-free
+    subgrid_indices = NULL;
     
     // ═══════════════════════════════════════════════════════════════
     // PHASE 3: Free elimination with uniqueness verification
     // ═══════════════════════════════════════════════════════════════
     
-    /*
-     * PHASE 3 STRATEGY: Verified free elimination with auto-target
-     * 
-     * Unlike Phases 1 and 2, Phase 3 can remove ANY remaining cell,
-     * but must verify that the puzzle retains a unique solution after
-     * each removal. This is computationally expensive but necessary
-     * for puzzle quality.
-     * 
-     * VERSION 3.0 CHANGE: We now use phase3EliminationAuto() instead of
-     * phase3Elimination(board, PHASE3_TARGET). The target is calculated
-     * proportionally based on board size:
-     * 
-     * | Board Size | Total Cells | Percentage | Target |
-     * |------------|-------------|------------|--------|
-     * | 4×4        | 16          | 31%        | ~5     |
-     * | 9×9        | 81          | 31%        | ~25    |
-     * | 16×16      | 256         | 27%        | ~69    |
-     * | 25×25      | 625         | 23%        | ~144   |
-     * 
-     * The decreasing percentage for larger boards accounts for:
-     * 1. Exponentially harder uniqueness verification
-     * 2. Higher constraint density in larger puzzles
-     * 3. Practical solving time for human players
-     * 
-     * For 9×9 boards, this produces IDENTICAL behavior to the old
-     * PHASE3_TARGET constant (81 × 0.31 ≈ 25).
-     */
     int removed3 = phase3EliminationAuto(board);
     
     if (stats) {
         stats->phase3_removed = removed3;
     }
     
+    // Emit phase 3 complete event
+    emit_event(SUDOKU_EVENT_PHASE3_COMPLETE, board, removed3, 0);
+    
     // ═══════════════════════════════════════════════════════════════
     // FINALIZATION: Update statistics and emit completion event
     // ═══════════════════════════════════════════════════════════════
     
-    // Update final statistics (clues and empty cells count)
     sudoku_board_update_stats(board);
     
-    // Emit generation complete event
     emit_event(SUDOKU_EVENT_GENERATION_COMPLETE, board, 0, 0);
     
     return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    SIMPLE WRAPPER (BACKWARD COMPATIBLE)
+//                    AC3HB ALGORITHM PATH (v3.0)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief AC3HB generation path - Constraint Propagation + Heuristic Search
+ * 
+ * ⚠️ CURRENT STATUS: STUB IMPLEMENTATION
+ * 
+ * This function is a placeholder for the future AC3HB implementation.
+ * For now, it simply calls generate_classic() to maintain functionality.
+ * 
+ * PLANNED IMPLEMENTATION (Week 3 of roadmap):
+ * 
+ * 1. Fisher-Yates diagonal filling (SAME as classic)
+ * 2. Build constraint network (NEW)
+ * 3. AC-3 constraint propagation (NEW)
+ * 4. Backtracking with heuristics (NEW)
+ * 5. Three-phase elimination (SAME as classic)
+ * 
+ * EXPECTED BENEFITS:
+ * - 30-60× speedup for 16×16 boards
+ * - Makes 25×25 generation practical
+ * 
+ * @note Currently forwards to generate_classic()
+ * @todo Implement full AC3HB algorithm (Week 3 roadmap)
+ */
+static bool generate_with_ac3hb(SudokuBoard *board,
+                               const SudokuGenerationConfig *config,
+                               SudokuGenerationStats *stats) {
+    
+    /*
+     * ⚠️ STUB IMPLEMENTATION
+     * 
+     * For now, delegate to classic algorithm.
+     * This allows compilation and testing while AC3HB is being developed.
+     */
+    
+    // TODO: Implement AC3HB path
+    // Week 1: AC-3 algorithm
+    // Week 2: Heuristics (MRV, LCV, Degree)
+    // Week 3: Integration
+    
+    return generate_classic(board, config, stats);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    SIMPLE API (BACKWARD COMPATIBLE)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Generate a Sudoku puzzle (simple version without callbacks)
  * 
  * Convenience wrapper that calls sudoku_generate_ex() with no callback.
- * This maintains backward compatibility with existing code.
- * 
- * @param[out] board Pointer to the board structure to fill
- * @param[out] stats Pointer to store generation statistics, or NULL
- * @return true if generation succeeded, false on failure
- * 
- * @see sudoku_generate_ex() for advanced version with event callbacks
+ * Maintains backward compatibility with existing code.
  */
 bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
     return sudoku_generate_ex(board, NULL, stats);
@@ -418,47 +391,15 @@ bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats) {
 /**
  * @brief Generate a Sudoku puzzle targeting a specific difficulty level
  * 
- * Similar to sudoku_generate(), but attempts to produce a puzzle
- * at the specified difficulty level. Currently uses the same algorithm
- * as sudoku_generate() and reports if the resulting difficulty differs
- * from the target.
- * 
- * @param[out] board Pointer to the board structure to fill (will be initialized)
- * @param[in] difficulty Desired difficulty level to target
- * @param[out] stats Pointer to store generation statistics, or NULL if not needed
- * @return true if generation succeeded, false on failure
- * 
- * @pre board != NULL
- * @post If returns true, board contains a valid puzzle (difficulty may vary from target)
- * 
- * @note Exact difficulty match is not guaranteed as it depends on random
- *       puzzle structure. The function makes best effort to approach target
- * 
- * @warning Not yet fully implemented - currently generates normally and reports
- *          actual difficulty. Future versions will adjust elimination parameters
- *          based on target difficulty
- * 
- * @todo Implement difficulty-specific elimination parameter adjustment
- * @todo Add retry logic if generated difficulty differs significantly from target
- * 
- * @see sudoku_evaluate_difficulty() to check actual difficulty of result
- * @see sudoku_difficulty_to_string() to display difficulty as text
+ * @note Currently generates normally - difficulty targeting not yet implemented
+ * @todo Adjust elimination parameters based on target difficulty
  */
 bool sudoku_generate_with_difficulty(SudokuBoard *board,
                                     SudokuDifficulty difficulty,
                                     SudokuGenerationStats *stats) {
-    // Generate using standard algorithm
-    // TODO: Adjust elimination parameters based on target difficulty
-    // For example:
-    // - EASY: Use lower Phase 3 target (fewer empty cells)
-    // - EXPERT: Use higher Phase 3 target (more empty cells)
     bool result = sudoku_generate(board, stats);
     
-    // Note: Difficulty reporting removed - should be done by application,
-    // not library. The application can call sudoku_evaluate_difficulty()
-    // and display results however it wants.
-    
-    (void)difficulty;  // Suppress unused parameter warning until implemented
+    (void)difficulty;  // Suppress unused parameter warning
     
     return result;
 }
@@ -470,56 +411,17 @@ bool sudoku_generate_with_difficulty(SudokuBoard *board,
 /**
  * @brief Evaluate the difficulty level of a puzzle
  * 
- * Analyzes a Sudoku puzzle and returns its estimated difficulty
- * based primarily on the number of clues (filled cells). This is
- * a simple heuristic that correlates reasonably well with solving
- * difficulty for human players.
- * 
- * VERSION 3.0: Difficulty thresholds are now scaled proportionally
- * to board size. The percentages below apply across all board sizes:
- * 
- * | Difficulty | Clue Percentage | 9×9 Clues | 16×16 Clues | 25×25 Clues |
- * |------------|-----------------|-----------|-------------|-------------|
- * | EASY       | ≥55%            | ≥45       | ≥141        | ≥344        |
- * | MEDIUM     | 43-54%          | 35-44     | 110-140     | 269-343     |
- * | HARD       | 31-42%          | 25-34     | 79-109      | 194-268     |
- * | EXPERT     | <31%            | <25       | <79         | <194        |
- * 
- * @param[in] board Pointer to the board to evaluate
- * @return Estimated difficulty level
- * 
- * @pre board != NULL
- * @pre board contains a valid puzzle (generated or partially solved)
- * 
- * @note This is a simple heuristic based solely on clue count. More
- *       sophisticated analysis could consider specific solving techniques
- *       required (naked pairs, X-wings, etc.) for more accurate rating
- * 
- * @see sudoku_difficulty_to_string() to convert result to readable format
+ * Analyzes based on clue percentage. Thresholds scale with board size:
+ * - EASY:   ≥55% filled
+ * - MEDIUM: ≥43% filled
+ * - HARD:   ≥31% filled
+ * - EXPERT: <31% filled
  */
 SudokuDifficulty sudoku_evaluate_difficulty(const SudokuBoard *board) {
     int clues = sudoku_board_get_clues(board);
     int board_size = sudoku_board_get_board_size(board);
     int total_cells = board_size * board_size;
     
-    /*
-     * SCALABLE DIFFICULTY EVALUATION
-     * 
-     * Instead of hardcoded thresholds (45, 35, 25), we calculate
-     * proportional thresholds based on total cells. This ensures
-     * consistent difficulty classification across all board sizes.
-     * 
-     * Threshold percentages:
-     * - EASY:   ≥55% filled (minimal deduction)
-     * - MEDIUM: ≥43% filled (moderate reasoning)
-     * - HARD:   ≥31% filled (advanced techniques)
-     * - EXPERT: <31% filled (very challenging)
-     * 
-     * For 9×9 boards, these produce the classic thresholds:
-     * - 81 × 0.55 ≈ 45 (EASY threshold)
-     * - 81 × 0.43 ≈ 35 (MEDIUM threshold)
-     * - 81 × 0.31 ≈ 25 (HARD threshold)
-     */
     int easy_threshold = (int)(total_cells * 0.55 + 0.5);
     int medium_threshold = (int)(total_cells * 0.43 + 0.5);
     int hard_threshold = (int)(total_cells * 0.31 + 0.5);
@@ -537,24 +439,6 @@ SudokuDifficulty sudoku_evaluate_difficulty(const SudokuBoard *board) {
 
 /**
  * @brief Convert difficulty level to human-readable string
- * 
- * Converts a SudokuDifficulty enumeration value into its
- * corresponding string representation for display purposes.
- * 
- * @param[in] difficulty The difficulty level to convert
- * @return Constant string representing the difficulty ("EASY", "MEDIUM",
- *         "HARD", "EXPERT", or "UNKNOWN" for invalid values)
- * 
- * @note The returned string is a static constant and should not be freed
- * @note Returns "UNKNOWN" for any invalid difficulty value
- * 
- * Example usage:
- * @code
- * SudokuDifficulty diff = sudoku_evaluate_difficulty(&board);
- * printf("Difficulty: %s\n", sudoku_difficulty_to_string(diff));
- * @endcode
- * 
- * @see sudoku_evaluate_difficulty() to determine puzzle difficulty
  */
 const char* sudoku_difficulty_to_string(SudokuDifficulty difficulty) {
     switch (difficulty) {
@@ -573,38 +457,26 @@ const char* sudoku_difficulty_to_string(SudokuDifficulty difficulty) {
 
 /*
  * ═══════════════════════════════════════════════════════════════════
- *                    VERSION 3.0.1 CHANGELOG
+ *                    VERSION 3.0.2 CHANGELOG
  * ═══════════════════════════════════════════════════════════════════
  * 
- * BUGFIX: Added retry loop for generation step
+ * NEW: Added AC3HB branching architecture
  * 
- * PROBLEM:
- * For 4×4 boards, Fisher-Yates diagonal filling created incompletable
- * configurations in ~70% of cases, causing generation to fail.
+ * ARCHITECTURAL CHANGES:
+ * - Refactored sudoku_generate_ex() into dispatcher
+ * - Extracted v2.2.1 logic into generate_classic()
+ * - Created generate_with_ac3hb() stub
  * 
- * ROOT CAUSE:
- * Small boards have very high constraint density. When diagonal subgrids
- * are filled randomly, the probability of creating a deadlock state is
- * much higher than for larger boards.
+ * BACKWARD COMPATIBILITY:
+ * - NULL config or config->use_ac3 = false → Classic path
+ * - config->use_ac3 = true → AC3HB path (stub)
+ * - All existing code works unchanged
  * 
- * SOLUTION:
- * Implemented retry loop that attempts generation multiple times with
- * different random diagonal configurations until one succeeds. Attempt
- * limits scale with board size based on empirical failure rates.
- * 
- * TESTING:
- * Before fix: 4×4 success rate ~30% (7/10 failures)
- * After fix:  4×4 success rate 100% (0/100 failures in stress test)
- *            9×9 backward compatibility: 100% (no regression)
- * 
- * PERFORMANCE IMPACT:
- * - 9×9: No impact (almost always succeeds first try)
- * - 4×4: Average 3.3 attempts needed, total time still < 5ms
- * - Overall: Minimal impact, ensures reliability
- * 
- * VERSION HISTORY:
- * - v3.0.0: Initial configurable board size support
- * - v3.0.1: Added retry loop for 4×4 reliability (this fix)
+ * NEXT STEPS:
+ * Week 1: Implement AC-3 algorithm
+ * Week 2: Implement heuristics
+ * Week 3: Complete generate_with_ac3hb()
+ * Week 4: Testing and optimization
  * 
  * ═══════════════════════════════════════════════════════════════════
  */

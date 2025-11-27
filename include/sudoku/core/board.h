@@ -34,7 +34,8 @@
  * @return Pointer to newly created board, or NULL on error
  * 
  * @note Caller must free with sudoku_board_destroy()
- * @note Valid sizes: 2, 3, 4, 5 (larger may be computationally expensive)
+ * @note Valid sizes: 2-10 (2=4×4 through 10=100×100)
+ * @note Practical limit: 7 (49×49), experimental: 8-10
  * @note Returns NULL if allocation fails or size is invalid
  * 
  * @warning Do NOT use stack allocation for SudokuBoard anymore

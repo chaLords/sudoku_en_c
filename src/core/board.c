@@ -177,7 +177,7 @@ SudokuBoard* sudoku_board_create_size(int subgrid_size) {
     // VALIDATION: Check for valid subgrid size
     // Valid Sudoku sizes: 2 (4×4), 3 (9×9), 4 (16×16), 5 (25×25)
     // Larger sizes are theoretically valid but computationally expensive
-    if (subgrid_size < 2 || subgrid_size > 5) {
+    if (subgrid_size < 2 || subgrid_size > 10) {
         fprintf(stderr, "Error: Invalid subgrid size %d (valid: 2-5)\n", 
                 subgrid_size);
         return NULL;
