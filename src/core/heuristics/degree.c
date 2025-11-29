@@ -28,51 +28,74 @@
 #include <limits.h>
 
 // ═══════════════════════════════════════════════════════════════════
-//                    HEURISTIC 1: MRV (Minimum Remaining Values)
+//                    HEURISTIC 2: Degree Heuristic
 // ═══════════════════════════════════════════════════════════════════
-// ARCHIVO: src/core/heuristics/mrv.c
+// ARCHIVO: src/core/heuristics/degree.c
 
 /**
- * @brief Select cell with minimum remaining values (MRV heuristic)
+ * @brief Count unassigned neighbors of a cell
  * 
- * The MRV heuristic implements the "fail-first" principle:
- * - Choose variable most likely to cause a failure soon
- * - Detects contradictions early in search tree
- * - Dramatically reduces branching factor
- * 
- * Algorithm:
- * 1. Scan all empty cells
- * 2. Find cell with smallest domain size
- * 3. Return that cell's position
+ * Helper function for degree heuristic.
  * 
  * @param net Constraint network
- * @return Position of cell with minimum domain, or (-1,-1) if none found
- * 
- * @complexity O(n²) - must scan entire board
- * @performance For 9×9: ~81 cells checked, ~0.01ms typical
- * 
- * @note Ties are broken arbitrarily (first found)
+ * @param row Cell row
+ * @param col Cell column
+ * @return Number of unassigned neighbors
  */
-SudokuPosition heuristic_mrv(const ConstraintNetwork *net) {
+static int count_unassigned_neighbors(const ConstraintNetwork *net, 
+                                     int row, int col) {
+    int neighbor_count;
+    const SudokuPosition *neighbors = 
+        constraint_network_get_neighbors(net, row, col, &neighbor_count);
+    
+    int unassigned = 0;
+    for (int i = 0; i < neighbor_count; i++) {
+        int domain_size = constraint_network_domain_size(net,
+                                                        neighbors[i].row,
+                                                        neighbors[i].col);
+        if (domain_size > 1) {  // Not assigned
+            unassigned++;
+        }
+    }
+    
+    return unassigned;
+}
+
+/**
+ * @brief Select cell using degree heuristic (tie-breaker for MRV)
+ * 
+ * When multiple cells have same minimum domain size:
+ * - Choose cell with most unassigned neighbors
+ * - Rationale: Constrains more other variables
+ * - Reduces future search space more effectively
+ * 
+ * @param net Constraint network
+ * @param min_domain Only consider cells with this domain size
+ * @return Position of cell with highest degree
+ * 
+ * @complexity O(n² · k) where k=neighbors per cell
+ * @note Usually called after MRV with min_domain from MRV result
+ */
+SudokuPosition heuristic_degree(const ConstraintNetwork *net, int min_domain) {
     assert(net != NULL);
     
     int board_size = constraint_network_get_board_size(net);
-    int min_domain = INT_MAX;
+    int max_degree = -1;
     SudokuPosition best_pos = {-1, -1};
     
-    // Scan all cells
     for (int r = 0; r < board_size; r++) {
         for (int c = 0; c < board_size; c++) {
             int domain_size = constraint_network_domain_size(net, r, c);
             
-            // Skip assigned cells (domain size == 1)
-            if (domain_size <= 1) {
+            // Only consider cells with specified domain size
+            if (domain_size != min_domain) {
                 continue;
             }
             
-            // Update minimum
-            if (domain_size < min_domain) {
-                min_domain = domain_size;
+            int degree = count_unassigned_neighbors(net, r, c);
+            
+            if (degree > max_degree) {
+                max_degree = degree;
                 best_pos.row = r;
                 best_pos.col = c;
             }
@@ -81,3 +104,4 @@ SudokuPosition heuristic_mrv(const ConstraintNetwork *net) {
     
     return best_pos;
 }
+

@@ -26,53 +26,81 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
-
 // ═══════════════════════════════════════════════════════════════════
-//                    HEURISTIC 1: MRV (Minimum Remaining Values)
+//                    HEURISTIC 3: Density Heuristic
 // ═══════════════════════════════════════════════════════════════════
-// ARCHIVO: src/core/heuristics/mrv.c
+// ARCHIVO: src/core/heuristics/density.c
 
 /**
- * @brief Select cell with minimum remaining values (MRV heuristic)
+ * @brief Compute constraint density around a cell
  * 
- * The MRV heuristic implements the "fail-first" principle:
- * - Choose variable most likely to cause a failure soon
- * - Detects contradictions early in search tree
- * - Dramatically reduces branching factor
+ * Density = (number of assigned neighbors) / (total neighbors)
  * 
- * Algorithm:
- * 1. Scan all empty cells
- * 2. Find cell with smallest domain size
- * 3. Return that cell's position
+ * Higher density = more constrained region = better to fill first
  * 
  * @param net Constraint network
- * @return Position of cell with minimum domain, or (-1,-1) if none found
- * 
- * @complexity O(n²) - must scan entire board
- * @performance For 9×9: ~81 cells checked, ~0.01ms typical
- * 
- * @note Ties are broken arbitrarily (first found)
+ * @param row Cell row
+ * @param col Cell column
+ * @return Density score [0.0 - 1.0]
  */
-SudokuPosition heuristic_mrv(const ConstraintNetwork *net) {
+static double compute_density(const ConstraintNetwork *net, int row, int col) {
+    int neighbor_count;
+    const SudokuPosition *neighbors = 
+        constraint_network_get_neighbors(net, row, col, &neighbor_count);
+    
+    if (neighbor_count == 0) {
+        return 0.0;
+    }
+    
+    int assigned = 0;
+    for (int i = 0; i < neighbor_count; i++) {
+        int domain_size = constraint_network_domain_size(net,
+                                                        neighbors[i].row,
+                                                        neighbors[i].col);
+        if (domain_size == 1) {  // Assigned
+            assigned++;
+        }
+    }
+    
+    return (double)assigned / neighbor_count;
+}
+
+/**
+ * @brief Select cell in most constrained region (density heuristic)
+ * 
+ * Strategy:
+ * - Prefer cells in regions with many assigned neighbors
+ * - These regions are more constrained
+ * - Easier to detect contradictions early
+ * 
+ * Combined with small domains for best results.
+ * 
+ * @param net Constraint network
+ * @return Position of cell in densest region with small domain
+ * 
+ * @complexity O(n² · k)
+ */
+SudokuPosition heuristic_density(const ConstraintNetwork *net) {
     assert(net != NULL);
     
     int board_size = constraint_network_get_board_size(net);
-    int min_domain = INT_MAX;
+    double best_score = -1.0;
     SudokuPosition best_pos = {-1, -1};
     
-    // Scan all cells
     for (int r = 0; r < board_size; r++) {
         for (int c = 0; c < board_size; c++) {
             int domain_size = constraint_network_domain_size(net, r, c);
             
-            // Skip assigned cells (domain size == 1)
             if (domain_size <= 1) {
-                continue;
+                continue;  // Skip assigned cells
             }
             
-            // Update minimum
-            if (domain_size < min_domain) {
-                min_domain = domain_size;
+            // Score = density / domain_size (prefer small domains in dense regions)
+            double density = compute_density(net, r, c);
+            double score = density / domain_size;
+            
+            if (score > best_score) {
+                best_score = score;
                 best_pos.row = r;
                 best_pos.col = c;
             }
@@ -81,3 +109,4 @@ SudokuPosition heuristic_mrv(const ConstraintNetwork *net) {
     
     return best_pos;
 }
+

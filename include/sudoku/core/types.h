@@ -334,9 +334,9 @@ typedef struct {
  */
 typedef struct {
     int index;              ///< Subgrid index (0 to board_size-1)
-    SudokuPosition base;    ///< Top-left corner position of this subgrid
+    int subgrid_size;       ///< Size of subgrid (e.g., 3 for 9×9, 4 for 16×16)
+    SudokuPosition base;    ///< Top-left corner position
 } SudokuSubGrid;
-
 // ═══════════════════════════════════════════════════════════════════
 //                    GENERATION STATISTICS
 // ═══════════════════════════════════════════════════════════════════
@@ -636,27 +636,6 @@ typedef void (*SudokuEventCallback)(const SudokuEventData *event, void *user_dat
  * sudoku_generate_ex(&board, &config, &stats);
  * @endcode
  */
-// ═══════════════════════════════════════════════════════════════
-// 🚧 STUB: Heuristic Strategy (v3.0 AC3HB - NOT YET IMPLEMENTED)
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * @brief Heuristic strategies for backtracking (AC3HB algorithm)
- * 
- * ⚠️ STUB IMPLEMENTATION - v3.0 AC3HB Feature
- * 
- * This enum will be fully implemented when AC3HB is added.
- * Currently, only HEURISTIC_NONE is available (classic backtracking).
- */
-typedef enum {
-    HEURISTIC_NONE = 0  ///< No heuristics (classic backtracking) - DEFAULT
-    
-    // TODO v3.0: Add these when implementing AC3HB:
-    // HEURISTIC_MRV = 1,      ///< Minimum Remaining Values
-    // HEURISTIC_LCV = 2,      ///< Least Constraining Value  
-    // HEURISTIC_DEGREE = 3,   ///< Degree heuristic
-    // HEURISTIC_COMBINED = 4  ///< Use all heuristics
-} HeuristicStrategy;
 
 // Ahora define SudokuGenerationConfig (tu código existente)
 typedef struct {
@@ -665,7 +644,7 @@ typedef struct {
     int max_attempts;
     bool use_ac3;
     bool use_heuristics;
-    HeuristicStrategy heuristic_strategy;  // ✅ Ahora compila
+    int heuristic_strategy;  // ✅ Ahora compila
 } SudokuGenerationConfig;
 
 #endif // SUDOKU_TYPES_H
