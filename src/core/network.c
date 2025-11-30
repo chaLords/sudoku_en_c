@@ -210,23 +210,19 @@ static int compute_neighbors(int row, int col,
 // ═══════════════════════════════════════════════════════════════════
 //                    NETWORK CREATION AND DESTRUCTION
 // ═══════════════════════════════════════════════════════════════════
-
 ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     if (board == NULL) {
         return NULL;
     }
     
-    // Allocate main structure
     ConstraintNetwork *net = (ConstraintNetwork*)malloc(sizeof(ConstraintNetwork));
     if (net == NULL) {
         return NULL;
     }
     
-    // Get board dimensions
     net->board_size = sudoku_board_get_board_size(board);
     net->subgrid_size = sudoku_board_get_subgrid_size(board);
     
-    // Allocate 2D arrays (using same pattern as board.c)
     int size = net->board_size;
     
     // 1. Allocate domains array
@@ -239,7 +235,6 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     for (int i = 0; i < size; i++) {
         net->domains[i] = (Domain*)malloc(size * sizeof(Domain));
         if (net->domains[i] == NULL) {
-            // Cleanup partial allocation
             for (int j = 0; j < i; j++) {
                 free(net->domains[j]);
             }
@@ -250,7 +245,7 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     }
     
     // 2. Allocate neighbor arrays
-    net->neighbors = (SudokuPosition***)malloc(size * sizeof(SudokuPosition*));
+    net->neighbors = (SudokuPosition***)malloc(size * sizeof(SudokuPosition**));
     if (net->neighbors == NULL) {
         for (int i = 0; i < size; i++) {
             free(net->domains[i]);
@@ -263,7 +258,6 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     for (int i = 0; i < size; i++) {
         net->neighbors[i] = (SudokuPosition**)malloc(size * sizeof(SudokuPosition*));
         if (net->neighbors[i] == NULL) {
-            // Cleanup
             for (int j = 0; j < i; j++) {
                 free(net->neighbors[j]);
             }
@@ -275,12 +269,18 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
             free(net);
             return NULL;
         }
+        
+        // ═══════════════════════════════════════════════════════════
+        // ✅ FIX BUG 2: Inicializar punteros a NULL antes de realloc
+        // ═══════════════════════════════════════════════════════════
+        for (int j = 0; j < size; j++) {
+            net->neighbors[i][j] = NULL;
+        }
     }
     
     // 3. Allocate neighbor counts
     net->neighbor_counts = (int**)malloc(size * sizeof(int*));
     if (net->neighbor_counts == NULL) {
-        // Cleanup everything
         for (int i = 0; i < size; i++) {
             free(net->neighbors[i]);
             free(net->domains[i]);
@@ -294,7 +294,6 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     for (int i = 0; i < size; i++) {
         net->neighbor_counts[i] = (int*)malloc(size * sizeof(int));
         if (net->neighbor_counts[i] == NULL) {
-            // Cleanup
             for (int j = 0; j < i; j++) {
                 free(net->neighbor_counts[j]);
             }
@@ -310,6 +309,9 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
         }
     }
     
+    // ═══════════════════════════════════════════════════════════════════
+    // ✅ FIX BUG 1: NO hacer propagación inicial - esa es responsabilidad de AC-3
+    // ═══════════════════════════════════════════════════════════════════
     // 4. Initialize domains and neighbors for each cell
     for (int row = 0; row < size; row++) {
         for (int col = 0; col < size; col++) {
@@ -320,53 +322,22 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
                 net->domains[row][col] = domain_singleton(value);
             } else {
                 // Empty cell: full domain initially
+                // ✅ NO propagamos aquí - AC-3 lo hará después
                 net->domains[row][col] = domain_full(size);
-                
-                // Remove values that conflict with filled neighbors
-                // (This is initial constraint propagation)
-                for (int r = 0; r < size; r++) {
-                    if (r != row) {
-                        int neighbor_val = sudoku_board_get_cell(board, r, col);
-                        if (neighbor_val != 0) {
-                            domain_remove(&net->domains[row][col], neighbor_val);
-                        }
-                    }
-                }
-                
-                for (int c = 0; c < size; c++) {
-                    if (c != col) {
-                        int neighbor_val = sudoku_board_get_cell(board, row, c);
-                        if (neighbor_val != 0) {
-                            domain_remove(&net->domains[row][col], neighbor_val);
-                        }
-                    }
-                }
-                
-                // Subgrid neighbors
-                int subgrid_row = (row / net->subgrid_size) * net->subgrid_size;
-                int subgrid_col = (col / net->subgrid_size) * net->subgrid_size;
-                
-                for (int r = subgrid_row; r < subgrid_row + net->subgrid_size; r++) {
-                    for (int c = subgrid_col; c < subgrid_col + net->subgrid_size; c++) {
-                        if (r != row && c != col) {
-                            int neighbor_val = sudoku_board_get_cell(board, r, c);
-                            if (neighbor_val != 0) {
-                                domain_remove(&net->domains[row][col], neighbor_val);
-                            }
-                        }
-                    }
-                }
             }
             
             // Compute neighbors (allocate temporary buffer)
-            SudokuPosition temp_neighbors[100];  // Max ~81 neighbors for 100×100 board
+            SudokuPosition temp_neighbors[100];
             int count = compute_neighbors(row, col, size, net->subgrid_size, temp_neighbors);
             
-            // Allocate exactly what we need
-            net->neighbors[row][col] = (SudokuPosition*)realloc(
-                net->neighbors[row][col],
-                count * sizeof(SudokuPosition)
-            );
+            // ✅ FIX: Usar malloc en lugar de realloc (ya inicializamos a NULL)
+            net->neighbors[row][col] = (SudokuPosition*)malloc(count * sizeof(SudokuPosition));
+            
+            if (net->neighbors[row][col] == NULL) {
+                // Cleanup en caso de fallo (simplificado)
+                constraint_network_destroy(net);
+                return NULL;
+            }
             
             // Copy neighbors
             memcpy(net->neighbors[row][col], temp_neighbors, count * sizeof(SudokuPosition));
@@ -376,7 +347,6 @@ ConstraintNetwork* constraint_network_create(const SudokuBoard *board) {
     
     return net;
 }
-
 void constraint_network_destroy(ConstraintNetwork *net) {
     if (net == NULL) {
         return;

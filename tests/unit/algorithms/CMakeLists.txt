@@ -36,6 +36,7 @@ add_executable(test_network
     test_network.c
     ${CMAKE_SOURCE_DIR}/src/core/board.c
     ${CMAKE_SOURCE_DIR}/src/core/network.c
+    ${CMAKE_SOURCE_DIR}/src/core/algorithms/ac3.c
 )
 
 target_include_directories(test_network PRIVATE

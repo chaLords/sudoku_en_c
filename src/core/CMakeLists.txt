@@ -12,6 +12,7 @@ set(ALGORITHM_SOURCES
   algorithms/fisher_yates.c
   algorithms/backtracking.c
   algorithms/diagonal.c
+  algorithms/ac3.c
 )
 
 # Archivos del sistema de eliminación

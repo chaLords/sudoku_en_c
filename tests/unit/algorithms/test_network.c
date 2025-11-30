@@ -6,19 +6,20 @@
  * 
  * UBICACIÓN: tests/unit/algorithms/test_network.c
  * 
+ * ARQUITECTURA v3.0:
+ *   - constraint_network_create(): Solo crea estructura de datos
+ *   - ac3_enforce_consistency(): Propaga restricciones
+ * 
  * COMPILAR:
- *   cd tests/unit/algorithms
- *   gcc -I../../../include -I../../../src/core/internal \
- *       ../../../src/core/board.c \
- *       ../../../src/core/network.c \
- *       test_network.c \
- *       -o test_network -std=c11
+ *   cd build && cmake .. && make test_network
  * 
  * EJECUTAR:
  *   ./test_network
+ *   valgrind --leak-check=full ./test_network
  */
 
 #include "sudoku/algorithms/network.h"
+#include "sudoku/algorithms/ac3.h"
 #include "sudoku/core/board.h"
 #include <stdio.h>
 #include <assert.h>
@@ -54,7 +55,7 @@ static int tests_passed = 0;
 //                    BASIC NETWORK TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-void test_network_create_destroy() {
+void test_network_create_destroy(void) {
     TEST("Network create and destroy");
     
     // Create 9×9 board
@@ -76,7 +77,7 @@ void test_network_create_destroy() {
     PASS();
 }
 
-void test_empty_board_domains() {
+void test_empty_board_domains(void) {
     TEST("Empty board has full domains");
     
     SudokuBoard *board = sudoku_board_create();
@@ -102,7 +103,7 @@ void test_empty_board_domains() {
     PASS();
 }
 
-void test_filled_cell_singleton() {
+void test_filled_cell_singleton(void) {
     TEST("Filled cell has singleton domain");
     
     SudokuBoard *board = sudoku_board_create();
@@ -128,8 +129,19 @@ void test_filled_cell_singleton() {
     PASS();
 }
 
-void test_constraint_propagation() {
-    TEST("Initial constraint propagation from filled cells");
+/**
+ * Test constraint propagation using AC-3 algorithm
+ * 
+ * ARQUITECTURA v3.0:
+ *   - constraint_network_create() solo crea la estructura
+ *   - ac3_enforce_consistency() propaga las restricciones
+ * 
+ * Esto sigue el Single Responsibility Principle (SRP):
+ *   - Network: estructura de datos
+ *   - AC-3: propagación de restricciones
+ */
+void test_constraint_propagation(void) {
+    TEST("Constraint propagation with AC-3");
     
     SudokuBoard *board = sudoku_board_create();
     
@@ -137,6 +149,17 @@ void test_constraint_propagation() {
     sudoku_board_set_cell(board, 0, 0, 5);
     
     ConstraintNetwork *net = constraint_network_create(board);
+    ASSERT(net != NULL, "Network creation failed");
+    
+    // ═══════════════════════════════════════════════════════════════
+    // Propagar restricciones con AC-3 (arquitectura v3.0)
+    // ═══════════════════════════════════════════════════════════════
+    AC3Statistics stats;
+    bool consistent = ac3_enforce_consistency(net, &stats);
+    ASSERT(consistent, "Network should be arc consistent");
+    
+    printf("  📊 AC-3 stats: %d revisions, %d propagations\n", 
+           stats.revisions, stats.propagations);
     
     // All cells in row 0 should not have 5 in domain
     for (int c = 1; c < 9; c++) {
@@ -170,7 +193,7 @@ void test_constraint_propagation() {
 //                    DOMAIN MANIPULATION TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-void test_remove_value() {
+void test_remove_value(void) {
     TEST("Remove value from domain");
     
     SudokuBoard *board = sudoku_board_create();
@@ -202,7 +225,7 @@ void test_remove_value() {
     PASS();
 }
 
-void test_assign_value() {
+void test_assign_value(void) {
     TEST("Assign value to create singleton domain");
     
     SudokuBoard *board = sudoku_board_create();
@@ -227,7 +250,7 @@ void test_assign_value() {
     PASS();
 }
 
-void test_restore_domain() {
+void test_restore_domain(void) {
     TEST("Restore full domain");
     
     SudokuBoard *board = sudoku_board_create();
@@ -260,7 +283,7 @@ void test_restore_domain() {
 //                    NEIGHBOR TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-void test_neighbors_count() {
+void test_neighbors_count(void) {
     TEST("Verify neighbor counts");
     
     SudokuBoard *board = sudoku_board_create();
@@ -282,7 +305,7 @@ void test_neighbors_count() {
     PASS();
 }
 
-void test_neighbors_unique() {
+void test_neighbors_unique(void) {
     TEST("Neighbors list has no duplicates");
     
     SudokuBoard *board = sudoku_board_create();
@@ -317,7 +340,7 @@ void test_neighbors_unique() {
 //                    ADVANCED TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-void test_domain_empty_detection() {
+void test_domain_empty_detection(void) {
     TEST("Detect empty domain");
     
     SudokuBoard *board = sudoku_board_create();
@@ -340,7 +363,7 @@ void test_domain_empty_detection() {
     PASS();
 }
 
-void test_total_possibilities() {
+void test_total_possibilities(void) {
     TEST("Count total possibilities");
     
     SudokuBoard *board = sudoku_board_create();
@@ -351,11 +374,15 @@ void test_total_possibilities() {
     ASSERT(total1 == 729, "Empty board should have 729 possibilities");
     constraint_network_destroy(net1);
     
-    // Fill one cell: reduces possibilities in neighbors
+    // Fill one cell: singleton domain reduces count by 8
+    // (from 9 to 1 for that cell)
     sudoku_board_set_cell(board, 0, 0, 5);
     ConstraintNetwork *net2 = constraint_network_create(board);
     int total2 = constraint_network_total_possibilities(net2);
-    ASSERT(total2 < 729, "Filled cell should reduce possibilities");
+    
+    // Without AC-3 propagation: 1 + 80*9 = 721
+    // The filled cell has domain {5} = 1 value
+    ASSERT(total2 == 721, "Filled cell should reduce total to 721");
     
     constraint_network_destroy(net2);
     sudoku_board_destroy(board);
@@ -363,7 +390,7 @@ void test_total_possibilities() {
     PASS();
 }
 
-void test_4x4_board() {
+void test_4x4_board(void) {
     TEST("Network works with 4×4 board");
     
     // Create 4×4 board (subgrid_size = 2)
@@ -402,7 +429,7 @@ void test_4x4_board() {
 int main(void) {
     printf("\n");
     printf("╔═══════════════════════════════════════════════════════╗\n");
-    printf("║   CONSTRAINT NETWORK UNIT TESTS                      ║\n");
+    printf("║   CONSTRAINT NETWORK UNIT TESTS                       ║\n");
     printf("╚═══════════════════════════════════════════════════════╝\n");
     
     // Basic tests
