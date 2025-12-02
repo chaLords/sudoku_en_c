@@ -5,14 +5,17 @@ set(CORE_SOURCES
     display.c
     generator.c
     events.c
+    network.c
 )
 
 # Archivos de algoritmos
 set(ALGORITHM_SOURCES
+  algorithms/ac3.c
+  algorithms/ac3hb.c
   algorithms/fisher_yates.c
   algorithms/backtracking.c
   algorithms/diagonal.c
-  algorithms/ac3.c
+  algorithms/heuristics.c
 )
 
 # Archivos del sistema de eliminación

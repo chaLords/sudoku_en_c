@@ -457,11 +457,11 @@ typedef struct {
  * @see sudoku_difficulty_to_string() for string conversion
  */
 typedef enum {
-    SUDOKU_EASY,        ///< Many clues (≥55% of cells filled)
-    SUDOKU_MEDIUM,      ///< Moderate clues (43-54% filled)
-    SUDOKU_HARD,        ///< Few clues (31-42% filled)
-    SUDOKU_EXPERT,      ///< Very few clues (<31% filled)
-    SUDOKU_INVALID      ///< Invalid board state (error condition)
+    DIFFICULTY_EASY,       ///< Many clues (≥55% of cells filled)
+    DIFFICULTY_MEDIUM,     ///< Moderate clues (43-54% filled)
+    DIFFICULTY_HARD,       ///< Few clues (31-42% filled)
+    DIFFICULTY_EXPERT,     ///< Very few clues (<31% filled)
+    DIFFICULTY_UNKNOWN     ///< Invalid board state (error condition)
 } SudokuDifficulty;
 
 // ═══════════════════════════════════════════════════════════════════
