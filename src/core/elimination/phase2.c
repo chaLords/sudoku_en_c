@@ -37,6 +37,11 @@
 #include "elimination_internal.h"
 #include "events_internal.h"
 #include "sudoku/core/validation.h"
+/*
+ * NUEVO EN v3.0: Includes para eliminación inteligente
+ */
+#include "elimination_config.h"
+#include "density_scoring.h"
 #include "sudoku/core/board.h"
 
 /**
@@ -232,6 +237,314 @@ int phase2Elimination(SudokuBoard *board, const int *index, int count) {
     // Emit phase 2 complete event
     emit_event(SUDOKU_EVENT_PHASE2_COMPLETE, board, 2, removed);
     
+    return removed;
+}
+
+/**
+ * @brief PHASE 2 SMART: Intelligent elimination guided by density scoring
+ * 
+ * This is an enhanced version of phase2Elimination() that uses density analysis
+ * to make strategic decisions about which subgrids to process first. Instead of
+ * processing subgrids in a fixed order, we calculate a "score" for each subgrid
+ * and process them in order of priority.
+ * 
+ * WHAT MAKES THIS "SMART":
+ * 
+ * The original phase2Elimination() processes subgrids in the order you give it,
+ * which is typically just the natural order from zero to eight. This works, but
+ * it doesn't take advantage of information we can extract from the board state.
+ * 
+ * The smart version analyzes each subgrid before processing and asks:
+ * - How full is this subgrid? (density)
+ * - How many cells can potentially be eliminated? (candidates)
+ * 
+ * Based on these metrics, we can prioritize our efforts. For EASY and MEDIUM
+ * puzzles, we want to process high-density subgrids first because they're safer.
+ * For HARD and EXPERT puzzles, we process them randomly to increase difficulty.
+ * 
+ * CONCEPTUAL ANALOGY:
+ * 
+ * Imagine you're a chef preparing a complex meal with many dishes. You could
+ * cook them in arbitrary order (original approach), or you could prioritize
+ * based on cooking time and complexity (smart approach). The smart chef finishes
+ * faster and produces better results because they work strategically.
+ * 
+ * Similarly, this function works strategically by processing subgrids in an
+ * order that maximizes the quality and difficulty of the resulting puzzle.
+ * 
+ * @param board The current board state (will be modified)
+ * @param config Configuration that controls behavior based on difficulty
+ * @return Number of cells eliminated in this round
+ * 
+ * @example
+ * ```c
+ * // Create configuration for EASY puzzle
+ * SudokuEliminationConfig config = sudoku_elimination_config_create(DIFFICULTY_EASY);
+ * 
+ * // Run Phase 2 smart in a loop until no more eliminations possible
+ * int total_removed = 0;
+ * int removed;
+ * do {
+ *     removed = phase2EliminationSmart(board, &config);
+ *     total_removed += removed;
+ * } while (removed > 0 && total_removed < 35);
+ * 
+ * printf("Phase 2 eliminated %d cells total\n", total_removed);
+ * ```
+ * 
+ * @note This function should be called in a loop, just like the original
+ *       phase2Elimination(), because removing cells can create new opportunities
+ *       for removal in subsequent rounds.
+ */
+int phase2EliminationSmart(SudokuBoard *board, 
+                          const SudokuEliminationConfig *config) {
+    
+    /*
+     * ═══════════════════════════════════════════════════════════════
+     * STEP 1: EMIT START EVENT
+     * ═══════════════════════════════════════════════════════════════
+     * 
+     * The event system allows external code (like tests or UI) to observe
+     * what's happening during generation. This is a professional pattern
+     * called "observer pattern" or "event-driven architecture".
+     * 
+     * WHY EVENTS MATTER:
+     * Instead of scattering printf() statements throughout the code (which
+     * would clutter the logic and make it hard to turn off), we emit events
+     * that interested parties can listen to. If nobody's listening, the
+     * events are essentially free (just a function call that returns quickly).
+     */
+    emit_event(SUDOKU_EVENT_PHASE2_START, board, 2, 0);
+    
+    /*
+     * ═══════════════════════════════════════════════════════════════
+     * STEP 2: CALCULATE SCORES FOR ALL SUBGRIDS
+     * ═══════════════════════════════════════════════════════════════
+     * 
+     * This is where the "intelligence" begins. Instead of blindly processing
+     * subgrids in arbitrary order, we first analyze them all and create a
+     * priority ranking.
+     * 
+     * WHAT THE SCORING DOES:
+     * For each of the nine subgrids (in a 9×9 board), we calculate:
+     * 1. Density: What percentage of cells are filled?
+     * 2. Candidates: How many cells could potentially be eliminated?
+     * 
+     * These two numbers together form a "score" that tells us how attractive
+     * this subgrid is for elimination purposes.
+     */
+    int num_subgrids;
+    SubGridScore *scores = sudoku_score_subgrids(board, config, &num_subgrids);
+    
+    /*
+     * DEFENSIVE PROGRAMMING: Check for allocation failure
+     * 
+     * If malloc() failed inside sudoku_score_subgrids(), we get NULL back.
+     * Rather than crashing with a segmentation fault (which would happen if
+     * we tried to use a NULL pointer), we handle it gracefully by returning
+     * zero eliminations.
+     * 
+     * This is called "fail-safe" behavior: if something goes wrong, we
+     * degrade gracefully rather than catastrophically.
+     */
+    if (scores == NULL) {
+        fprintf(stderr, "ERROR: Memory allocation failed in phase2EliminationSmart\n");
+        return 0;
+    }
+    
+    /*
+     * ═══════════════════════════════════════════════════════════════
+     * STEP 3: SORT SUBGRIDS BY SCORE (CONDITIONAL)
+     * ═══════════════════════════════════════════════════════════════
+     * 
+     * Here's where we make a strategic decision based on difficulty level.
+     * 
+     * FOR EASY AND MEDIUM PUZZLES:
+     * We sort the subgrids so that high-density ones come first. This means
+     * we'll process the "safest" subgrids first, where "safe" means they have
+     * more constraints and are less likely to create multiple solutions when
+     * we eliminate cells from them.
+     * 
+     * Think of it like removing blocks from a Jenga tower: you want to remove
+     * blocks from the top (well-supported, high density) rather than from the
+     * bottom (risky, low density).
+     * 
+     * FOR HARD AND EXPERT PUZZLES:
+     * We DON'T sort them. This leaves them in whatever order they were
+     * calculated, which is effectively random. This increases difficulty
+     * because we might end up removing cells from low-density subgrids,
+     * creating a more challenging puzzle.
+     * 
+     * THE QSORT FUNCTION:
+     * qsort() is a standard C library function that sorts an array. It needs
+     * to know:
+     * - The array to sort (scores)
+     * - How many elements (num_subgrids)
+     * - The size of each element (sizeof(SubGridScore))
+     * - How to compare elements (sudoku_compare_subgrid_scores_desc)
+     * 
+     * The comparison function determines the sort order. Our comparison function
+     * is defined in density_scoring.c and compares by density first, then by
+     * candidate count as a tiebreaker.
+     */
+    if (config->prioritize_high_density) {
+        qsort(scores, num_subgrids, sizeof(SubGridScore), 
+              sudoku_compare_subgrid_scores_desc);
+    }
+    
+    /*
+     * ═══════════════════════════════════════════════════════════════
+     * STEP 4: PROCESS SUBGRIDS IN PRIORITY ORDER
+     * ═══════════════════════════════════════════════════════════════
+     * 
+     * Now we iterate through the subgrids in the order determined by sorting
+     * (or in the original order if we didn't sort). For each subgrid, we
+     * attempt to eliminate one cell that has no alternatives.
+     * 
+     * IMPORTANT LOOP INVARIANT:
+     * We eliminate AT MOST one cell per subgrid per round. This maintains
+     * balance across the board and prevents any single subgrid from becoming
+     * too sparse too quickly.
+     */
+    int removed = 0;
+    
+    for (int idx = 0; idx < num_subgrids; idx++) {
+        /*
+         * Get the actual subgrid index from the score structure.
+         * If we sorted, this gives us subgrids in density order.
+         * If we didn't sort, this gives us natural order (0, 1, 2, ..., 8).
+         */
+        int subgrid_idx = scores[idx].subgrid_idx;
+        
+        /*
+         * Create a SubGrid object for convenient iteration
+         * 
+         * The SubGrid abstraction hides the messy arithmetic of converting
+         * from subgrid index to actual board positions. We just iterate
+         * from 0 to board_size and let the SubGrid handle the position
+         * calculations.
+         */
+        SudokuSubGrid sg = sudoku_subgrid_create(subgrid_idx, board->subgrid_size);
+        int board_size = sudoku_board_get_board_size(board);
+        
+        /*
+         * INNER LOOP: Search for a cell to eliminate
+         * 
+         * We iterate through each cell in this subgrid, looking for one that:
+         * 1. Contains a number (is filled)
+         * 2. Has no alternatives elsewhere
+         * 
+         * When we find such a cell, we eliminate it and break out of the loop,
+         * ensuring we only remove one cell per subgrid.
+         */
+        for (int i = 0; i < board_size; i++) {
+            SudokuPosition pos = sudoku_subgrid_get_position(&sg, i);
+            int num = board->cells[pos.row][pos.col];
+            
+            // Skip empty cells
+            if (num == 0) continue;
+            
+            /*
+             * CHECK FOR ALTERNATIVES:
+             * 
+             * This is the core logic of Phase 2. We ask: "If we remove this
+             * number, could it go anywhere else in the same row, column, or
+             * subgrid?"
+             * 
+             * The hasAlternative() function (from the original phase2.c)
+             * temporarily removes the number and checks if it can be placed
+             * elsewhere while respecting Sudoku rules.
+             * 
+             * If it returns false (no alternatives), this number is "locked"
+             * into this position, making it safe to eliminate from a puzzle
+             * generation perspective. The solver will be forced to deduce
+             * that this number must go here.
+             */
+            if (!hasAlternative(board, &pos, num)) {
+                /*
+                 * ELIMINATE THE CELL:
+                 * 
+                 * Set the cell to zero, which represents an empty cell.
+                 * This is the actual elimination action.
+                 */
+                board->cells[pos.row][pos.col] = 0;
+                removed++;
+                
+                /*
+                 * EMIT CELL EVENT:
+                 * 
+                 * Notify observers that we eliminated a cell. This event
+                 * includes detailed information:
+                 * - Which phase (2)
+                 * - How many cells removed so far (removed)
+                 * - The position (pos.row, pos.col)
+                 * - The number that was there (num)
+                 * 
+                 * This allows external code to log, display, or analyze
+                 * the elimination process in real-time.
+                 */
+                emit_event_cell(SUDOKU_EVENT_PHASE2_CELL_SELECTED, 
+                                      board, 2, removed, 
+                                      pos.row, pos.col, num);
+                
+                /*
+                 * BREAK: One per subgrid per round
+                 * 
+                 * This break is critical. It ensures we only remove one cell
+                 * from this subgrid before moving to the next. This maintains
+                 * balance and prevents over-elimination from any single region.
+                 * 
+                 * Why is balance important? If we removed all possible cells
+                 * from one subgrid in a single round, we might make that region
+                 * extremely sparse while others remain dense, creating an
+                 * unbalanced puzzle that's frustrating to solve.
+                 */
+                break;
+            }
+        }
+    }
+    
+    /*
+     * ═══════════════════════════════════════════════════════════════
+     * STEP 5: CLEANUP AND RETURN
+     * ═══════════════════════════════════════════════════════════════
+     * 
+     * MEMORY MANAGEMENT:
+     * We allocated the scores array with malloc() at the beginning, so we
+     * MUST free it now to avoid a memory leak. Every malloc() must have a
+     * matching free(), and this is that match.
+     * 
+     * This is one of the responsibilities of C programming: manual memory
+     * management. Languages like Python or Java do this automatically
+     * (garbage collection), but in C, we must be explicit.
+     */
+    free(scores);
+    
+    /*
+     * EMIT COMPLETION EVENT:
+     * 
+     * Signal that this round of Phase 2 has completed and report how many
+     * cells were eliminated.
+     */
+    emit_event(SUDOKU_EVENT_PHASE2_COMPLETE, board, 2, removed);
+    
+    /*
+     * RETURN RESULT:
+     * 
+     * The return value tells the caller how many cells were eliminated in
+     * this round. If this is zero, it means we couldn't find any more cells
+     * to eliminate, and the caller should stop calling this function.
+     * 
+     * Typical usage pattern:
+     * ```c
+     * int removed;
+     * do {
+     *     removed = phase2EliminationSmart(board, config);
+     * } while (removed > 0);
+     * ```
+     * 
+     * This continues calling Phase 2 until it returns zero (no more work).
+     */
     return removed;
 }
 

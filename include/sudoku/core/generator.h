@@ -110,6 +110,44 @@ bool sudoku_generate_ex(SudokuBoard *board,
                         const SudokuGenerationConfig *config,
                         SudokuGenerationStats *stats);
 
+
+/**
+ * @brief Simple puzzle generation with default settings (MEDIUM difficulty)
+ * 
+ * This is the recommended function for most use cases. It generates a complete,
+ * playable Sudoku puzzle with MEDIUM difficulty using intelligent elimination
+ * strategies.
+ * 
+ * @param board Board to generate puzzle into (must be initialized)
+ * @param stats Output parameter for generation statistics
+ * @return true if generation succeeded, false otherwise
+ */
+bool sudoku_generate(SudokuBoard *board, SudokuGenerationStats *stats);
+
+/**
+ * @brief Advanced puzzle generation with specified difficulty level
+ * 
+ * This function provides full control over puzzle difficulty. It uses the
+ * intelligent elimination system introduced in v3.0, which adapts elimination
+ * strategies based on the desired difficulty level.
+ * 
+ * DIFFICULTY LEVELS AND EXPECTED RESULTS (for 9×9):
+ * - DIFFICULTY_EASY:   36-46 clues (43-56% elimination)
+ * - DIFFICULTY_MEDIUM: 32-35 clues (57-60% elimination)
+ * - DIFFICULTY_HARD:   28-31 clues (62-65% elimination)
+ * - DIFFICULTY_EXPERT: 22-27 clues (67-73% elimination)
+ * 
+ * These percentages scale proportionally for other board sizes.
+ * 
+ * @param board Board to generate puzzle into (must be initialized)
+ * @param difficulty Desired difficulty level
+ * @param stats Output parameter for generation statistics
+ * @return true if generation succeeded, false otherwise
+ */
+bool sudoku_generate_puzzle_with_difficulty(SudokuBoard *board,
+                                           SudokuDifficulty difficulty,
+                                           SudokuGenerationStats *stats);
+
 /**
  * @brief Generate complete Sudoku with default configuration
  * 

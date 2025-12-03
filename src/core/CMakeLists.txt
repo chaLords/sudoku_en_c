@@ -22,7 +22,9 @@ set(ALGORITHM_SOURCES
 set(ELIMINATION_SOURCES
     elimination/phase1.c
     elimination/phase2.c
-    elimination/phase3.c 
+    elimination/phase3.c
+    elimination/elimination_config.c
+    elimination/density_scoring.c
 )
 
 # Crear biblioteca estática del core

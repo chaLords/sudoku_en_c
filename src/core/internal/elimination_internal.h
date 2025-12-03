@@ -40,7 +40,7 @@
 
 #include <stdbool.h>
 #include "sudoku/core/types.h"
-
+#include "elimination_config.h"
 // ═══════════════════════════════════════════════════════════════
 //                    PHASE 1: BALANCED DISTRIBUTION
 // ═══════════════════════════════════════════════════════════════
@@ -202,7 +202,39 @@ bool hasAlternative(SudokuBoard *board, const SudokuPosition *pos, int num);
  * @internal Used by phase3Elimination()
  */
 int countSolutionsExact(SudokuBoard *board, int limit);
+// ═══════════════════════════════════════════════════════════════
+//                    SMART ELIMINATION FUNCTIONS (v3.0)
+// ═══════════════════════════════════════════════════════════════
 
+/**
+ * @brief Phase 2 Smart: Intelligent elimination using density scoring
+ * 
+ * Enhanced version of phase2Elimination that uses the density scoring
+ * system to prioritize which subgrids to process based on the difficulty
+ * configuration.
+ * 
+ * @param board Board to perform elimination on
+ * @param config Elimination configuration (controls strategy)
+ * @return Number of cells removed in this round
+ */
+int phase2EliminationSmart(SudokuBoard *board, 
+                          const SudokuEliminationConfig *config);
+
+/**
+ * @brief Phase 3 Smart: Verified elimination with dynamic target
+ * 
+ * Enhanced version of phase3Elimination that uses the difficulty
+ * configuration to calculate an appropriate removal target based
+ * on the desired difficulty level and cells already removed.
+ * 
+ * @param board Board to perform elimination on
+ * @param config Elimination configuration
+ * @param already_removed Number of cells already removed in Phase 1+2
+ * @return Number of cells successfully removed
+ */
+int phase3EliminationSmart(SudokuBoard *board,
+                          const SudokuEliminationConfig *config,
+                          int already_removed);
 #endif  /* SUDOKU_ELIMINATION_INTERNAL_H */
 
 /**

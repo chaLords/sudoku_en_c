@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
         };
         
         // Call the library's generation function WITH CALLBACK SUPPORT
-        if(sudoku_generate_ex(board, &config, &stats)) {
+        if(sudoku_generate(board, &stats)) {
             if(verbosity_level >= 1) {
                 printf("✅ SUCCESS! Sudoku generated\n\n");
             }
