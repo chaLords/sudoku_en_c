@@ -4,7 +4,15 @@
  * @author Gonzalo Ramírez
  * @date 2025-12
  * 
- * UBICACIÓN: src/algorithms/ac3hb.c
+ * UBICACIÓN: src/core/algorithms/ac3hb.c
+ * 
+ * MODIFICACIONES v3.0.1 (2025-12-05):
+ * - Agregado límite de profundidad recursiva (max_depth)
+ * - Agregado sistema de timeout para tableros grandes
+ * - Implementado iterative deepening para 25×25
+ * - Prevención de stack overflow y loops infinitos
+ * - FIX CRÍTICO: Eliminada variable estática call_count que causaba
+ *   acumulación entre ejecuciones. Ahora usa depth directamente.
  * 
  * ═══════════════════════════════════════════════════════════════════════════
  *                    ALGORITMO AC3HB - DISEÑO ORIGINAL v3.0
@@ -84,17 +92,95 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <time.h>
+
+// ═══════════════════════════════════════════════════════════════════
+//                    AC3HB CONFIGURATION & TIMEOUT
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Configuración del algoritmo AC3HB con límites
+ */
+typedef struct {
+    int max_depth;           // Límite de profundidad recursiva
+    int max_time_seconds;    // Timeout en segundos
+    bool use_iterative;      // Usar iterative deepening (25×25)
+} AC3HBConfig;
+
+/**
+ * @brief Estructura para control de timeout
+ */
+typedef struct {
+    time_t start_time;
+    int max_seconds;
+    bool timeout_triggered;
+} AC3HBTimeout;
+
+// Variable global para timeout (thread-safe en contexto single-threaded)
+static AC3HBTimeout g_timeout = {0, 0, false};
+
+/**
+ * @brief Obtiene configuración óptima según tamaño de tablero
+ */
+static AC3HBConfig ac3hb_get_config(int board_size) {
+    AC3HBConfig config;
+    
+    if (board_size <= 9) {
+        config.max_depth = 1000;
+        config.max_time_seconds = 10;
+        config.use_iterative = false;
+    } else if (board_size <= 16) {
+        config.max_depth = 300;
+        config.max_time_seconds = 15;
+        config.use_iterative = false;
+    } else {
+        // Tableros >= 25×25: iterative deepening
+        config.max_depth = 150;
+        config.max_time_seconds = 60;
+        config.use_iterative = true;
+    }
+    
+    return config;
+}
+
+/**
+ * @brief Verifica si se excedió el timeout
+ */
+static bool ac3hb_check_timeout(void) {
+    if (g_timeout.max_seconds <= 0) {
+        return false;
+    }
+    
+    time_t now = time(NULL);
+    double elapsed = difftime(now, g_timeout.start_time);
+    
+    if (elapsed >= g_timeout.max_seconds) {
+        g_timeout.timeout_triggered = true;
+        return true;
+    }
+    
+    return false;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //                    FORWARD DECLARATIONS
 // ═══════════════════════════════════════════════════════════════════
 
-// Función recursiva principal del ciclo AC3HB
+// Función recursiva principal del ciclo AC3HB (MODIFICADA: agrega max_depth)
 static bool ac3hb_solve_recursive(ConstraintNetwork *net,
                                   SudokuBoard *board,
                                   SubgridDensityCache *density_cache,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
-                                  int depth);
+                                  int depth,
+                                  int max_depth);
+
+// Función de iterative deepening para tableros grandes
+static bool ac3hb_solve_iterative(ConstraintNetwork *net,
+                                  SudokuBoard *board,
+                                  SubgridDensityCache *density_cache,
+                                  const HeuristicConfig *config,
+                                  AC3HBStats *stats,
+                                  const AC3HBConfig *ac3hb_config);
 
 // ═══════════════════════════════════════════════════════════════════
 //                    DOMAIN BACKUP/RESTORE
@@ -243,13 +329,23 @@ static int get_singleton_value(const ConstraintNetwork *net, int row, int col) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    CORE AC3HB ALGORITHM
+//                    CORE AC3HB ALGORITHM (MODIFICADO)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Recursive AC3HB solving function
+ * @brief Recursive AC3HB solving function (MODIFICADO: con límites)
+ * 
+ * CAMBIOS v3.0.1:
+ * - Agregado parámetro max_depth
+ * - Check de profundidad al inicio
+ * - Check de timeout periódico usando depth (NO variable estática)
+ * - Early exit en caso de límites excedidos
  * 
  * ALGORITMO PRINCIPAL:
+ * 
+ * 0. VERIFICACIÓN DE LÍMITES (NUEVO):
+ *    - Si depth >= max_depth → return false
+ *    - Cada 100 niveles: check timeout
  * 
  * 1. PROPAGACIÓN AC3:
  *    - Aplicar AC3 para reducir dominios
@@ -275,7 +371,7 @@ static int get_singleton_value(const ConstraintNetwork *net, int row, int col) {
  *      a. Backup dominios afectados
  *      b. Asignar valor
  *      c. Propagar con AC3
- *      d. Recursión
+ *      d. Recursión (pasando depth + 1 y max_depth)
  *      e. Si éxito → return true
  *      f. Si falla → restore dominios, probar siguiente
  * 
@@ -287,6 +383,7 @@ static int get_singleton_value(const ConstraintNetwork *net, int row, int col) {
  * @param config Heuristic configuration
  * @param stats Statistics output
  * @param depth Current recursion depth
+ * @param max_depth Maximum recursion depth (NUEVO)
  * @return true if solution found, false otherwise
  */
 static bool ac3hb_solve_recursive(ConstraintNetwork *net,
@@ -294,7 +391,26 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
                                   SubgridDensityCache *density_cache,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
-                                  int depth) {
+                                  int depth,
+                                  int max_depth) {
+    // ═══════════════════════════════════════════════════════════════
+    // PASO 0: Verificación de límites (NUEVO)
+    // ═══════════════════════════════════════════════════════════════
+    
+    // Check de profundidad
+    if (depth >= max_depth) {
+        return false;
+    }
+    
+    // Check de timeout (cada 100 niveles usando depth directamente)
+    // FIX CRÍTICO: Eliminada variable estática call_count que causaba
+    // acumulación entre múltiples ejecuciones del test
+    if (depth % 100 == 0) {
+        if (ac3hb_check_timeout()) {
+            return false;
+        }
+    }
+    
     // Update max depth statistic
     if (stats && depth > stats->max_depth) {
         stats->max_depth = depth;
@@ -420,10 +536,10 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
             stats->values_eliminated += prop_stats.values_removed;
         }
         
-        // 6d. Recursión si consistente
+        // 6d. Recursión si consistente (MODIFICADO: pasar max_depth)
         if (prop_consistent) {
             if (ac3hb_solve_recursive(net, board, density_cache, config, 
-                                      stats, depth + 1)) {
+                                      stats, depth + 1, max_depth)) {
                 // ¡ÉXITO! Limpiar y retornar
                 free(backups);
                 free(candidates);
@@ -456,21 +572,76 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API
+//                    ITERATIVE DEEPENING (NUEVO)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Iterative deepening para tableros grandes
+ * 
+ * Estrategia para evitar stack overflow y loops infinitos:
+ * 1. Intentar con depth_limit = 20, 40, 60, ..., max_depth
+ * 2. Para cada límite, ejecutar solve con ese límite
+ * 3. Si encuentra solución, retornar
+ * 4. Si timeout, abortar
+ * 
+ * @return true si encuentra solución
+ */
+static bool ac3hb_solve_iterative(ConstraintNetwork *net,
+                                  SudokuBoard *board,
+                                  SubgridDensityCache *density_cache,
+                                  const HeuristicConfig *config,
+                                  AC3HBStats *stats,
+                                  const AC3HBConfig *ac3hb_config) {
+    // Intentar con profundidades incrementales
+    for (int depth_limit = 20; 
+         depth_limit <= ac3hb_config->max_depth; 
+         depth_limit += 20) {
+        
+        bool success = ac3hb_solve_recursive(net, board, density_cache,
+                                             config, stats, 0, depth_limit);
+        
+        if (success) {
+            return true;
+        }
+        
+        // Check timeout
+        if (g_timeout.timeout_triggered) {
+            return false;
+        }
+        
+        // Reset stats para siguiente intento
+        if (stats) {
+            stats->total_backtracks = 0;
+            stats->cells_assigned = 0;
+        }
+    }
+    
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//                    PUBLIC API (MODIFICADO)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Complete a partially filled board using AC3HB algorithm
  * 
+ * MODIFICADO v3.0.1:
+ * - Configura límites según tamaño de tablero
+ * - Usa iterative deepening para tableros >= 25×25
+ * - Maneja timeout apropiadamente
+ * 
  * Esta es la función principal que reemplaza al backtracking simple
  * en generator.c cuando use_ac3 está habilitado.
  * 
  * FLUJO:
- * 1. Crear ConstraintNetwork desde el board actual
- * 2. Crear density cache
- * 3. Configurar heurísticas
- * 4. Llamar a ac3hb_solve_recursive
- * 5. Limpiar y retornar resultado
+ * 1. Obtener configuración según board_size
+ * 2. Crear ConstraintNetwork desde el board actual
+ * 3. Crear density cache
+ * 4. Configurar heurísticas
+ * 5. Configurar timeout
+ * 6. Llamar a solve (recursivo o iterativo)
+ * 7. Limpiar y retornar resultado
  * 
  * @param board Board with some cells filled (modified in place)
  * @return true if board completed successfully, false otherwise
@@ -478,16 +649,17 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
 bool sudoku_complete_ac3hb(SudokuBoard *board) {
     assert(board != NULL);
     
+    int board_size = sudoku_board_get_board_size(board);
+    AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
+    
     // Crear constraint network desde el estado actual del board
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
-        fprintf(stderr, "Error: Failed to create constraint network\n");
         return false;
     }
     
     // Crear density cache
     SubgridDensityCache *density_cache = subgrid_density_cache_create(net);
-    // density_cache puede ser NULL, algoritmo funciona sin él
     
     // Configuración de heurísticas (usar default)
     HeuristicConfig config = heuristic_config_default();
@@ -495,9 +667,23 @@ bool sudoku_complete_ac3hb(SudokuBoard *board) {
     // Estadísticas
     AC3HBStats stats = {0};
     
-    // Resolver
-    bool success = ac3hb_solve_recursive(net, board, density_cache, 
-                                         &config, &stats, 0);
+    // Configurar timeout
+    g_timeout.start_time = time(NULL);
+    g_timeout.max_seconds = ac3hb_config.max_time_seconds;
+    g_timeout.timeout_triggered = false;
+    
+    // Resolver (elegir estrategia según configuración)
+    bool success;
+    if (ac3hb_config.use_iterative) {
+        // Tableros grandes: iterative deepening
+        success = ac3hb_solve_iterative(net, board, density_cache,
+                                        &config, &stats, &ac3hb_config);
+    } else {
+        // Tableros normales: recursión directa
+        success = ac3hb_solve_recursive(net, board, density_cache, 
+                                        &config, &stats, 0, 
+                                        ac3hb_config.max_depth);
+    }
     
     // Limpiar
     subgrid_density_cache_destroy(density_cache);
@@ -518,6 +704,9 @@ bool sudoku_complete_ac3hb(SudokuBoard *board) {
 bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
     assert(board != NULL);
     
+    int board_size = sudoku_board_get_board_size(board);
+    AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
+    
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
         return false;
@@ -528,10 +717,22 @@ bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
     
     AC3HBStats local_stats = {0};
     
-    bool success = ac3hb_solve_recursive(net, board, density_cache,
+    g_timeout.start_time = time(NULL);
+    g_timeout.max_seconds = ac3hb_config.max_time_seconds;
+    g_timeout.timeout_triggered = false;
+    
+    bool success;
+    if (ac3hb_config.use_iterative) {
+        success = ac3hb_solve_iterative(net, board, density_cache,
+                                        &config, 
+                                        stats ? stats : &local_stats,
+                                        &ac3hb_config);
+    } else {
+        success = ac3hb_solve_recursive(net, board, density_cache,
                                          &config, 
                                          stats ? stats : &local_stats, 
-                                         0);
+                                         0, ac3hb_config.max_depth);
+    }
     
     subgrid_density_cache_destroy(density_cache);
     constraint_network_destroy(net);
@@ -554,6 +755,9 @@ bool sudoku_complete_ac3hb_config(SudokuBoard *board,
                                   AC3HBStats *stats) {
     assert(board != NULL);
     
+    int board_size = sudoku_board_get_board_size(board);
+    AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
+    
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
         return false;
@@ -570,10 +774,22 @@ bool sudoku_complete_ac3hb_config(SudokuBoard *board,
     
     AC3HBStats local_stats = {0};
     
-    bool success = ac3hb_solve_recursive(net, board, density_cache,
+    g_timeout.start_time = time(NULL);
+    g_timeout.max_seconds = ac3hb_config.max_time_seconds;
+    g_timeout.timeout_triggered = false;
+    
+    bool success;
+    if (ac3hb_config.use_iterative) {
+        success = ac3hb_solve_iterative(net, board, density_cache,
+                                        config,
+                                        stats ? stats : &local_stats,
+                                        &ac3hb_config);
+    } else {
+        success = ac3hb_solve_recursive(net, board, density_cache,
                                          config,
                                          stats ? stats : &local_stats,
-                                         0);
+                                         0, ac3hb_config.max_depth);
+    }
     
     subgrid_density_cache_destroy(density_cache);
     constraint_network_destroy(net);
@@ -605,4 +821,3 @@ void print_ac3hb_stats(const AC3HBStats *stats) {
     printf("  Total time:          %.2f ms\n", stats->time_ms);
     printf("═══════════════════════════════════════════════════════\n");
 }
-
