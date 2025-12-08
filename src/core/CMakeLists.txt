@@ -13,6 +13,7 @@ set(ALGORITHM_SOURCES
   algorithms/ac3.c
   algorithms/ac3hb.c
   algorithms/fisher_yates.c
+  algorithms/forced_cells.c
   algorithms/backtracking.c
   algorithms/diagonal.c
   algorithms/heuristics.c

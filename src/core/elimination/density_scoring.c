@@ -5,6 +5,7 @@
 
 #include "density_scoring.h"
 #include "sudoku/core/validation.h"
+#include "board_internal.h"
 #include <stdlib.h>
 #include <stdio.h>
 

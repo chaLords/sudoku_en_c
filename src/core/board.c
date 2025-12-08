@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include "sudoku/algorithms/forced_cells.h"  // ← NUEVA LÍNEA
 
 // ═══════════════════════════════════════════════════════════════════
 //                    MEMORY MANAGEMENT
@@ -256,17 +257,18 @@ void sudoku_board_destroy(SudokuBoard *board) {
         return;  // Nothing to destroy
     }
     
+    // 🆕 Destroy forced cells registry if present
+    if (board->forced_cells != NULL) {
+        forced_cells_registry_destroy(board->forced_cells);
+        board->forced_cells = NULL;
+    }
+    
     // Free the 2D cells array (handles NULL gracefully)
     free_cells(board);
     
     // Free the board structure itself
     free(board);
-    
-    // Note: We don't set board to NULL here because we can't modify
-    // the caller's pointer. The caller should do: 
-    // sudoku_board_destroy(board); board = NULL;
 }
-
 // ═══════════════════════════════════════════════════════════════════
 //                    BOARD INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
@@ -481,3 +483,30 @@ SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, int cell_ind
     
     return pos;
 }
+// ═══════════════════════════════════════════════════════════════════
+//                    FORCED CELLS REGISTRY MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+void sudoku_board_set_forced_cells(SudokuBoard *board, 
+                                    ForcedCellsRegistry *registry) {
+    if (board == NULL) {
+        return;  // Safety: don't crash on NULL board
+    }
+    
+    // Destroy any existing registry to prevent memory leak
+    if (board->forced_cells != NULL) {
+        forced_cells_registry_destroy(board->forced_cells);
+    }
+    
+    // Attach new registry (board takes ownership)
+    board->forced_cells = registry;
+}
+
+ForcedCellsRegistry* sudoku_board_get_forced_cells(const SudokuBoard *board) {
+    if (board == NULL) {
+        return NULL;
+    }
+    
+    return board->forced_cells;
+}
+

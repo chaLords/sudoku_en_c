@@ -326,5 +326,53 @@ SudokuSubGrid sudoku_subgrid_create(int index, int subgrid_size);
  * @pre 0 <= cell_index < sg->subgrid_size²
  */
 SudokuPosition sudoku_subgrid_get_position(const SudokuSubGrid *sg, int cell_index);
+// ═══════════════════════════════════════════════════════════════════
+//                    FORCED CELLS REGISTRY MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Set the forced cells registry for a board
+ * 
+ * This function allows attaching a ForcedCellsRegistry to a board.
+ * The registry is created during AC3HB generation and used during
+ * Phase 3 elimination for intelligent cell protection.
+ * 
+ * OWNERSHIP TRANSFER:
+ * ------------------
+ * When you call this function, the board takes OWNERSHIP of the registry.
+ * The board will automatically destroy the registry when:
+ * - sudoku_board_destroy() is called
+ * - A new registry is set (old one is destroyed first)
+ * 
+ * @param board Board to attach registry to (must not be NULL)
+ * @param registry Registry to attach (can be NULL to clear)
+ * 
+ * @note This function destroys any existing registry before setting new one
+ * @note Pass NULL to clear the registry without setting a new one
+ * @note After calling, do NOT manually destroy the registry - board owns it
+ */
+void sudoku_board_set_forced_cells(SudokuBoard *board, 
+                                    ForcedCellsRegistry *registry);
+
+/**
+ * @brief Get the forced cells registry from a board
+ * 
+ * Retrieves the ForcedCellsRegistry attached to this board, if any.
+ * The registry contains information about which cells were logically
+ * forced during AC3HB generation.
+ * 
+ * OWNERSHIP:
+ * ---------
+ * The board OWNS the registry. Do NOT destroy the returned pointer.
+ * The registry remains valid until:
+ * - sudoku_board_destroy() is called
+ * - sudoku_board_set_forced_cells() is called with a new registry
+ * 
+ * @param board Board to query (must not be NULL)
+ * @return Pointer to registry, or NULL if none attached
+ * 
+ * @note Do NOT free() the returned pointer - board owns it
+ */
+ForcedCellsRegistry* sudoku_board_get_forced_cells(const SudokuBoard *board);
 
 #endif // SUDOKU_CORE_BOARD_H

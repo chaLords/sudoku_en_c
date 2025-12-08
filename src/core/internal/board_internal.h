@@ -201,6 +201,24 @@ struct SudokuBoard {
      * Invariant: empty = total_cells - clues
      */
     int empty;
+  /**
+     * @brief Registry of forced cells (filled during AC3HB generation)
+     * 
+     * Este registry se crea durante sudoku_complete_ac3hb() y se usa
+     * en phase3EliminationSmart() para protección inteligente.
+     * 
+     * LIFECYCLE:
+     * - Creado: Al inicio de sudoku_complete_ac3hb()
+     * - Llenado: Durante propagación AC3 y backtracking
+     * - Usado: En phase3EliminationSmart()
+     * - Destruido: Al final de sudoku_generate() o en error paths
+     * 
+     * Puede ser NULL si:
+     * - Board no fue generado con AC3HB
+     * - Generación falló
+     * - Board fue creado manualmente
+     */
+    ForcedCellsRegistry *forced_cells;
 };
 
 #endif // SUDOKU_BOARD_INTERNAL_H

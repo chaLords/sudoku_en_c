@@ -1,0 +1,150 @@
+/**
+ * @file generator.h
+ * @brief Sudoku puzzle generator with multiple strategies
+ * @author Gonzalo Ramírez
+ * @date 2025-12
+ */
+
+#ifndef SUDOKU_GENERATOR_H
+#define SUDOKU_GENERATOR_H
+
+#include "sudoku/core/types.h"
+#include "sudoku/core/board.h"
+#include <stdbool.h>
+
+// ═══════════════════════════════════════════════════════════════════
+//                    GENERATION CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Generation strategy selection
+ */
+typedef enum {
+    STRATEGY_BACKTRACKING,    ///< Classic recursive backtracking
+    STRATEGY_AC3HB            ///< AC3 + Heuristics + Backtracking
+} GenerationStrategy;
+
+/**
+ * @brief Configuration for puzzle generation
+ */
+typedef struct {
+    GenerationStrategy strategy;     ///< Which algorithm to use
+    int max_attempts;                ///< Maximum generation attempts
+    bool use_heuristics;             ///< Enable intelligent heuristics
+    int target_difficulty;           ///< Desired difficulty (0-100)
+    bool verify_uniqueness;          ///< Verify solution uniqueness
+} GenerationConfig;
+
+// ═══════════════════════════════════════════════════════════════════
+//                    GENERATION STATISTICS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Statistics from generation process
+ */
+typedef struct {
+    int total_backtracks;      ///< Total backtrack operations
+    int cells_filled;          ///< Number of cells filled
+    int attempts_used;         ///< Attempts needed to succeed
+    double time_ms;            ///< Total time in milliseconds
+    GenerationStrategy strategy_used;  ///< Strategy that was used
+} GenerationStats;
+
+// ═══════════════════════════════════════════════════════════════════
+//                    MAIN GENERATION FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Generate a complete valid Sudoku board
+ * 
+ * @param board Board to fill (modified in place)
+ * @param config Generation configuration
+ * @param[out] stats Output statistics (can be NULL)
+ * @return true if generation succeeded
+ */
+bool sudoku_generate_complete(SudokuBoard *board,
+                              const GenerationConfig *config,
+                              GenerationStats *stats);
+
+/**
+ * @brief Complete a partially filled board using backtracking
+ * 
+ * Classic backtracking algorithm (v2.x compatibility).
+ * 
+ * @param board Partially filled board
+ * @return true if completion succeeded
+ */
+bool sudoku_complete_backtracking(SudokuBoard *board);
+
+/**
+ * @brief Complete a partially filled board using AC3HB
+ * 
+ * AC3 + Heuristics + Backtracking hybrid algorithm (v3.0).
+ * 
+ * @param board Partially filled board
+ * @return true if completion succeeded
+ */
+bool sudoku_complete_ac3hb(SudokuBoard *board);
+
+// ═══════════════════════════════════════════════════════════════════
+//                    CONFIGURATION HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Get default generation configuration
+ * 
+ * Uses AC3HB strategy with heuristics enabled.
+ */
+GenerationConfig generation_config_default(void);
+
+/**
+ * @brief Get backtracking-only configuration
+ * 
+ * For compatibility with v2.x or benchmarking.
+ */
+GenerationConfig generation_config_backtracking(void);
+/**
+ * @brief Get default generation configuration
+ * 
+ * @return Default configuration struct
+ */
+SudokuGenerationConfig sudoku_generation_config_default(void);
+// ═══════════════════════════════════════════════════════════════════
+//                    DIFFICULTY EVALUATION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Evaluate puzzle difficulty based on clue count
+ * 
+ * @param board Board to evaluate
+ * @return Difficulty level
+ */
+SudokuDifficulty sudoku_evaluate_difficulty(const SudokuBoard *board);
+
+/**
+ * @brief Convert difficulty enum to string
+ * 
+ * @param difficulty Difficulty level
+ * @return String representation
+ */
+const char* sudoku_difficulty_to_string(SudokuDifficulty difficulty);
+
+// ═══════════════════════════════════════════════════════════════════
+//                    EXTENDED GENERATION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Extended generation with detailed configuration and stats
+ * 
+ * This is a convenience wrapper around sudoku_generate_complete()
+ * that provides the same functionality with optional parameters.
+ * 
+ * @param board Board to fill
+ * @param config Generation configuration (can be NULL for defaults)
+ * @param stats Output statistics (can be NULL)
+ * @return true if generation succeeded
+ */
+bool sudoku_generate_ex(SudokuBoard *board,
+                        const SudokuGenerationConfig *config,  // ✅ CON prefijo
+                        SudokuGenerationStats *stats);         // ✅ CON prefijo
+#endif // SUDOKU_GENERATOR_H

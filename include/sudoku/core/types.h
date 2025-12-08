@@ -156,6 +156,15 @@ typedef struct {
     int col;    ///< Column index (0 to board_size-1)
 } SudokuPosition;
 
+/**
+ * @brief Forward declaration for forced cells registry
+ * 
+ * El registry se adjunta al board durante generación AC3HB
+ * y se usa durante Phase 3 para protección inteligente.
+ */
+typedef struct ForcedCellsRegistry ForcedCellsRegistry;
+
+
 // ═══════════════════════════════════════════════════════════════════
 //                    BOARD STRUCTURE (Configurable Size)
 // ═══════════════════════════════════════════════════════════════════
@@ -192,108 +201,19 @@ typedef struct {
  * @see sudoku_board_create_size() for creating boards of specific sizes
  * @see sudoku_board_destroy() for proper cleanup
  */
-typedef struct {
-    // ─────────────────────────────────────────────────────────────
-    //  Dimension Configuration
-    // ─────────────────────────────────────────────────────────────
-    
-    /**
-     * @brief Size of each subgrid (k in k×k subgrids)
-     * 
-     * For classic Sudoku: 3 (3×3 subgrids)
-     * Valid range: 2-5 (larger sizes may be computationally expensive)
-     * 
-     * This is the fundamental parameter from which all other
-     * dimensions are derived: board_size = subgrid_size²
-     */
-    int subgrid_size;
-    
-    /**
-     * @brief Size of the board (subgrid_size²)
-     * 
-     * Represents both the width and height of the square board,
-     * as well as the number of subgrids in the board.
-     * 
-     * Examples:
-     * - Mini Sudoku:    2² = 4  (4×4 board)
-     * - Classic Sudoku: 3² = 9  (9×9 board)
-     * - Mega Sudoku:    4² = 16 (16×16 board)
-     * - Giant Sudoku:   5² = 25 (25×25 board)
-     */
-    int board_size;
-    
-    /**
-     * @brief Total number of cells in the board (board_size²)
-     * 
-     * This is a convenience field to avoid repeated calculation.
-     * Invariant: total_cells == board_size * board_size
-     * 
-     * Examples:
-     * - Mini Sudoku:    4² = 16 cells
-     * - Classic Sudoku: 9² = 81 cells
-     * - Mega Sudoku:    16² = 256 cells
-     * - Giant Sudoku:   25² = 625 cells
-     */
-    int total_cells;
-    
-    // ─────────────────────────────────────────────────────────────
-    //  Board Data (Dynamic Allocation)
-    // ─────────────────────────────────────────────────────────────
-    
-    /**
-     * @brief 2D array representing the board cells [board_size][board_size]
-     * 
-     * Cell values:
-     * - 0: Empty cell (needs to be filled by solver/player)
-     * - 1 to board_size: Valid numbers
-     * 
-     * Memory layout:
-     * - Pointer to array of row pointers (heap allocated)
-     * - Each row is a contiguous array of integers (heap allocated)
-     * - Total memory: board_size * sizeof(int*) + board_size² * sizeof(int)
-     * 
-     * Access patterns:
-     * - Direct: board->cells[row][col] (fast, but bypasses encapsulation)
-     * - Safe: sudoku_board_get_cell(board, &pos) (recommended)
-     * 
-     * @note Allocated by sudoku_board_create_size()
-     * @note Freed by sudoku_board_destroy()
-     * @warning Do not free individual rows or the cells pointer directly
-     */
-    int **cells;
-    
-    // ─────────────────────────────────────────────────────────────
-    //  Board Statistics
-    // ─────────────────────────────────────────────────────────────
-    
-    /**
-     * @brief Number of filled cells (non-zero values)
-     * 
-     * Range: 0 to total_cells
-     * 
-     * This field is updated by sudoku_board_update_stats() and
-     * should be called after any sequence of cell modifications
-     * to keep statistics accurate.
-     * 
-     * @see sudoku_board_update_stats() to refresh this value
-     * @see sudoku_board_get_clues() for accessor function
-     */
-    int clues;
-    
-    /**
-     * @brief Number of empty cells (zero values)
-     * 
-     * Range: 0 to total_cells
-     * Invariant: clues + empty == total_cells
-     * 
-     * This field is updated by sudoku_board_update_stats().
-     * 
-     * @see sudoku_board_update_stats() to refresh this value
-     * @see sudoku_board_get_empty() for accessor function
-     */
-    int empty;
-} SudokuBoard;
-
+/**
+ * @brief Opaque pointer to Sudoku board structure
+ * 
+ * The complete definition is in src/core/internal/board_internal.h
+ * This ensures encapsulation - users cannot access internal fields directly.
+ * 
+ * Use accessor functions:
+ * - sudoku_board_get_cell()
+ * - sudoku_board_set_cell()
+ * - sudoku_board_get_clues()
+ * - etc.
+ */
+typedef struct SudokuBoard SudokuBoard;
 // ═══════════════════════════════════════════════════════════════════
 //                    SUBGRID STRUCTURE
 // ═══════════════════════════════════════════════════════════════════

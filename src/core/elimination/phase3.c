@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include "algorithms_internal.h"
 #include "elimination_internal.h"
+#include "board_internal.h"
 #include "events_internal.h"
 #include "sudoku/core/validation.h"  // Provides countSolutionsExact() declaration
 #include "sudoku/core/board.h"

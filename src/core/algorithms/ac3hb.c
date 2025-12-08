@@ -6,6 +6,12 @@
  * 
  * UBICACIÓN: src/core/algorithms/ac3hb.c
  * 
+ * MODIFICACIONES v3.1.0 (2025-12-07):
+ * - Integración del Sistema de Celdas Forzadas
+ * - Registro de celdas lógicamente deducibles durante AC3HB
+ * - Timeout aumentado a 180s para tableros 25×25
+ * - Registry adjuntado al board para uso en Phase 3
+ * 
  * MODIFICACIONES v3.0.1 (2025-12-05):
  * - Agregado límite de profundidad recursiva (max_depth)
  * - Agregado sistema de timeout para tableros grandes
@@ -84,6 +90,7 @@
 #include "sudoku/algorithms/ac3hb.h"
 #include "sudoku/algorithms/network.h"
 #include "sudoku/algorithms/heuristics.h"
+#include "sudoku/algorithms/forced_cells.h"
 #include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 #include <stdlib.h>
@@ -120,6 +127,8 @@ static AC3HBTimeout g_timeout = {0, 0, false};
 
 /**
  * @brief Obtiene configuración óptima según tamaño de tablero
+ * 
+ * MODIFICADO v3.1.0: Timeout aumentado a 180s para 25×25
  */
 static AC3HBConfig ac3hb_get_config(int board_size) {
     AC3HBConfig config;
@@ -133,9 +142,9 @@ static AC3HBConfig ac3hb_get_config(int board_size) {
         config.max_time_seconds = 15;
         config.use_iterative = false;
     } else {
-        // Tableros >= 25×25: iterative deepening
+        // Tableros >= 25×25: iterative deepening + timeout extendido
         config.max_depth = 150;
-        config.max_time_seconds = 60;
+        config.max_time_seconds = 180;  // ✅ AUMENTADO: 60s → 180s
         config.use_iterative = true;
     }
     
@@ -165,22 +174,26 @@ static bool ac3hb_check_timeout(void) {
 //                    FORWARD DECLARATIONS
 // ═══════════════════════════════════════════════════════════════════
 
-// Función recursiva principal del ciclo AC3HB (MODIFICADA: agrega max_depth)
+// Función recursiva principal del ciclo AC3HB
+// ✅ MODIFICADO v3.1.0: Agregado ForcedCellsRegistry
 static bool ac3hb_solve_recursive(ConstraintNetwork *net,
                                   SudokuBoard *board,
                                   SubgridDensityCache *density_cache,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
                                   int depth,
-                                  int max_depth);
+                                  int max_depth,
+                                  ForcedCellsRegistry *forced_registry);
 
 // Función de iterative deepening para tableros grandes
+// ✅ MODIFICADO v3.1.0: Agregado ForcedCellsRegistry
 static bool ac3hb_solve_iterative(ConstraintNetwork *net,
                                   SudokuBoard *board,
                                   SubgridDensityCache *density_cache,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
-                                  const AC3HBConfig *ac3hb_config);
+                                  const AC3HBConfig *ac3hb_config,
+                                  ForcedCellsRegistry *forced_registry);
 
 // ═══════════════════════════════════════════════════════════════════
 //                    DOMAIN BACKUP/RESTORE
@@ -329,11 +342,79 @@ static int get_singleton_value(const ConstraintNetwork *net, int row, int col) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//                    FORCED CELLS DETECTION (NUEVO v3.1.0)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Registra una celda como forzada si cumple criterios
+ * 
+ * Una celda es "forzada" si su valor fue determinado lógicamente
+ * (dominio reducido a 1) en lugar de asignado por búsqueda.
+ * 
+ * CRITERIOS:
+ * - Domain size == 1
+ * - No fue asignada explícitamente en este paso
+ * - Fue reducida por AC3 propagation
+ * 
+ * @param net Constraint network
+ * @param forced_registry Registry donde registrar
+ * @param row Row de la celda
+ * @param col Column de la celda
+ */
+static void register_forced_cell_if_applicable(
+    const ConstraintNetwork *net,
+    ForcedCellsRegistry *forced_registry,
+    int row, int col) 
+{
+    if (!forced_registry) {
+        return;  // Registry opcional
+    }
+    
+    // Solo registrar si dominio es singleton (forzado por AC3)
+    if (constraint_network_domain_size(net, row, col) == 1) {
+        int value = get_singleton_value(net, row, col);
+        if (value > 0) {
+            forced_cells_register(forced_registry, row, col, value, 
+                      FORCED_PROPAGATED, 0);        
+        }
+    }
+}
+
+/**
+ * @brief Detecta y registra todas las celdas forzadas actuales
+ * 
+ * Escanea el tablero completo y registra todas las celdas
+ * cuyo dominio fue reducido a 1 por propagación AC3.
+ * 
+ * Se llama después de cada propagación AC3 exitosa.
+ */
+static void detect_and_register_forced_cells(
+    const ConstraintNetwork *net,
+    ForcedCellsRegistry *forced_registry)
+{
+    if (!forced_registry) {
+        return;
+    }
+    
+    int board_size = constraint_network_get_board_size(net);
+    
+    for (int row = 0; row < board_size; row++) {
+        for (int col = 0; col < board_size; col++) {
+            register_forced_cell_if_applicable(net, forced_registry, row, col);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //                    CORE AC3HB ALGORITHM (MODIFICADO)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * @brief Recursive AC3HB solving function (MODIFICADO: con límites)
+ * @brief Recursive AC3HB solving function
+ * 
+ * MODIFICADO v3.1.0:
+ * - Agregado parámetro ForcedCellsRegistry
+ * - Detección y registro de celdas forzadas durante propagación
  * 
  * CAMBIOS v3.0.1:
  * - Agregado parámetro max_depth
@@ -341,50 +422,7 @@ static int get_singleton_value(const ConstraintNetwork *net, int row, int col) {
  * - Check de timeout periódico usando depth (NO variable estática)
  * - Early exit en caso de límites excedidos
  * 
- * ALGORITMO PRINCIPAL:
- * 
- * 0. VERIFICACIÓN DE LÍMITES (NUEVO):
- *    - Si depth >= max_depth → return false
- *    - Cada 100 niveles: check timeout
- * 
- * 1. PROPAGACIÓN AC3:
- *    - Aplicar AC3 para reducir dominios
- *    - Si detecta inconsistencia → return false
- * 
- * 2. VERIFICACIÓN DE COMPLETITUD:
- *    - Si todas las celdas tienen dominio singleton → ¡ÉXITO!
- *    - Copiar valores al board y return true
- * 
- * 3. DETECCIÓN DE DEAD-END:
- *    - Si existe dominio vacío → return false
- * 
- * 4. SELECCIÓN DE CELDA:
- *    - Usar heurísticas (MRV + Densidad + Grado)
- *    - Obtener celda óptima para asignar
- * 
- * 5. ORDENAR CANDIDATOS:
- *    - Usar LCV (Least Constraining Value)
- *    - Probar valores que eliminan menos posibilidades primero
- * 
- * 6. BRANCHING:
- *    - Para cada candidato:
- *      a. Backup dominios afectados
- *      b. Asignar valor
- *      c. Propagar con AC3
- *      d. Recursión (pasando depth + 1 y max_depth)
- *      e. Si éxito → return true
- *      f. Si falla → restore dominios, probar siguiente
- * 
- * 7. Si ningún candidato funcionó → return false (backtrack)
- * 
- * @param net Constraint network
- * @param board Board to fill with solution
- * @param density_cache Subgrid density cache
- * @param config Heuristic configuration
- * @param stats Statistics output
- * @param depth Current recursion depth
- * @param max_depth Maximum recursion depth (NUEVO)
- * @return true if solution found, false otherwise
+ * @param forced_registry Registry para celdas forzadas (puede ser NULL)
  */
 static bool ac3hb_solve_recursive(ConstraintNetwork *net,
                                   SudokuBoard *board,
@@ -392,9 +430,10 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
                                   int depth,
-                                  int max_depth) {
+                                  int max_depth,
+                                  ForcedCellsRegistry *forced_registry) {
     // ═══════════════════════════════════════════════════════════════
-    // PASO 0: Verificación de límites (NUEVO)
+    // PASO 0: Verificación de límites
     // ═══════════════════════════════════════════════════════════════
     
     // Check de profundidad
@@ -403,8 +442,6 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
     }
     
     // Check de timeout (cada 100 niveles usando depth directamente)
-    // FIX CRÍTICO: Eliminada variable estática call_count que causaba
-    // acumulación entre múltiples ejecuciones del test
     if (depth % 100 == 0) {
         if (ac3hb_check_timeout()) {
             return false;
@@ -432,6 +469,9 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
         // AC3 detectó inconsistencia → dead-end
         return false;
     }
+    
+    // ✅ NUEVO v3.1.0: Detectar celdas forzadas después de AC3
+    detect_and_register_forced_cells(net, forced_registry);
     
     // ═══════════════════════════════════════════════════════════════
     // PASO 2: Verificar si tablero está completo
@@ -536,10 +576,15 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
             stats->values_eliminated += prop_stats.values_removed;
         }
         
-        // 6d. Recursión si consistente (MODIFICADO: pasar max_depth)
+        // ✅ NUEVO v3.1.0: Registrar celdas forzadas después de propagación
+        if (prop_consistent) {
+            detect_and_register_forced_cells(net, forced_registry);
+        }
+        
+        // 6d. Recursión si consistente
         if (prop_consistent) {
             if (ac3hb_solve_recursive(net, board, density_cache, config, 
-                                      stats, depth + 1, max_depth)) {
+                                      stats, depth + 1, max_depth, forced_registry)) {
                 // ¡ÉXITO! Limpiar y retornar
                 free(backups);
                 free(candidates);
@@ -572,33 +617,29 @@ static bool ac3hb_solve_recursive(ConstraintNetwork *net,
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    ITERATIVE DEEPENING (NUEVO)
+//                    ITERATIVE DEEPENING (MODIFICADO)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Iterative deepening para tableros grandes
  * 
- * Estrategia para evitar stack overflow y loops infinitos:
- * 1. Intentar con depth_limit = 20, 40, 60, ..., max_depth
- * 2. Para cada límite, ejecutar solve con ese límite
- * 3. Si encuentra solución, retornar
- * 4. Si timeout, abortar
- * 
- * @return true si encuentra solución
+ * MODIFICADO v3.1.0: Pasa forced_registry a recursive
  */
 static bool ac3hb_solve_iterative(ConstraintNetwork *net,
                                   SudokuBoard *board,
                                   SubgridDensityCache *density_cache,
                                   const HeuristicConfig *config,
                                   AC3HBStats *stats,
-                                  const AC3HBConfig *ac3hb_config) {
+                                  const AC3HBConfig *ac3hb_config,
+                                  ForcedCellsRegistry *forced_registry) {
     // Intentar con profundidades incrementales
     for (int depth_limit = 20; 
          depth_limit <= ac3hb_config->max_depth; 
          depth_limit += 20) {
         
         bool success = ac3hb_solve_recursive(net, board, density_cache,
-                                             config, stats, 0, depth_limit);
+                                             config, stats, 0, depth_limit,
+                                             forced_registry);
         
         if (success) {
             return true;
@@ -620,41 +661,45 @@ static bool ac3hb_solve_iterative(ConstraintNetwork *net,
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//                    PUBLIC API (MODIFICADO)
+//                    PUBLIC API (MODIFICADO v3.1.0)
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * @brief Complete a partially filled board using AC3HB algorithm
  * 
+ * MODIFICADO v3.1.0:
+ * - Crea ForcedCellsRegistry al inicio
+ * - Pasa registry a funciones de solving
+ * - Adjunta registry al board si exitoso
+ * - Limpia registry si falla
+ * 
  * MODIFICADO v3.0.1:
  * - Configura límites según tamaño de tablero
  * - Usa iterative deepening para tableros >= 25×25
  * - Maneja timeout apropiadamente
- * 
- * Esta es la función principal que reemplaza al backtracking simple
- * en generator.c cuando use_ac3 está habilitado.
- * 
- * FLUJO:
- * 1. Obtener configuración según board_size
- * 2. Crear ConstraintNetwork desde el board actual
- * 3. Crear density cache
- * 4. Configurar heurísticas
- * 5. Configurar timeout
- * 6. Llamar a solve (recursivo o iterativo)
- * 7. Limpiar y retornar resultado
- * 
- * @param board Board with some cells filled (modified in place)
- * @return true if board completed successfully, false otherwise
  */
 bool sudoku_complete_ac3hb(SudokuBoard *board) {
     assert(board != NULL);
     
     int board_size = sudoku_board_get_board_size(board);
     AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
+
+    // ✅ NUEVO v3.1.0: Crear registry de celdas forzadas
+    ForcedCellsRegistry *forced_registry = 
+        forced_cells_registry_create(board_size);
+    
+    if (!forced_registry) {
+        fprintf(stderr, "Warning: Failed to create forced cells registry\n");
+        // Continuar sin registry (feature opcional)
+    }
     
     // Crear constraint network desde el estado actual del board
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
+        // ✅ NUEVO: Limpiar registry en caso de error
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
         return false;
     }
     
@@ -677,15 +722,27 @@ bool sudoku_complete_ac3hb(SudokuBoard *board) {
     if (ac3hb_config.use_iterative) {
         // Tableros grandes: iterative deepening
         success = ac3hb_solve_iterative(net, board, density_cache,
-                                        &config, &stats, &ac3hb_config);
+                                        &config, &stats, &ac3hb_config,
+                                        forced_registry);
     } else {
         // Tableros normales: recursión directa
         success = ac3hb_solve_recursive(net, board, density_cache, 
                                         &config, &stats, 0, 
-                                        ac3hb_config.max_depth);
+                                        ac3hb_config.max_depth,
+                                        forced_registry);
     }
     
-    // Limpiar
+    // ✅ NUEVO v3.1.0: Adjuntar registry al board si exitoso
+    if (success) {
+        sudoku_board_set_forced_cells(board, forced_registry);    
+  } else {
+        // Limpiar registry si falla
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
+    }
+    
+    // Limpiar recursos
     subgrid_density_cache_destroy(density_cache);
     constraint_network_destroy(net);
     
@@ -695,11 +752,7 @@ bool sudoku_complete_ac3hb(SudokuBoard *board) {
 /**
  * @brief Complete board with AC3HB and return statistics
  * 
- * Versión extendida que retorna estadísticas detalladas.
- * 
- * @param board Board to complete
- * @param[out] stats Statistics output (can be NULL)
- * @return true if successful
+ * MODIFICADO v3.1.0: Integración con forced cells
  */
 bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
     assert(board != NULL);
@@ -707,8 +760,15 @@ bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
     int board_size = sudoku_board_get_board_size(board);
     AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
     
+    // ✅ Crear registry
+    ForcedCellsRegistry *forced_registry = 
+        forced_cells_registry_create(board_size);
+    
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
         return false;
     }
     
@@ -726,12 +786,23 @@ bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
         success = ac3hb_solve_iterative(net, board, density_cache,
                                         &config, 
                                         stats ? stats : &local_stats,
-                                        &ac3hb_config);
+                                        &ac3hb_config,
+                                        forced_registry);
     } else {
         success = ac3hb_solve_recursive(net, board, density_cache,
                                          &config, 
                                          stats ? stats : &local_stats, 
-                                         0, ac3hb_config.max_depth);
+                                         0, ac3hb_config.max_depth,
+                                         forced_registry);
+    }
+    
+    // ✅ Adjuntar o limpiar registry
+    if (success) {
+        sudoku_board_set_forced_cells(board, forced_registry);
+    } else {
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
     }
     
     subgrid_density_cache_destroy(density_cache);
@@ -743,12 +814,7 @@ bool sudoku_complete_ac3hb_ex(SudokuBoard *board, AC3HBStats *stats) {
 /**
  * @brief Complete board with custom heuristic configuration
  * 
- * Permite personalizar pesos de heurísticas para testing/benchmarking.
- * 
- * @param board Board to complete
- * @param config Custom heuristic configuration
- * @param[out] stats Statistics output (can be NULL)
- * @return true if successful
+ * MODIFICADO v3.1.0: Integración con forced cells
  */
 bool sudoku_complete_ac3hb_config(SudokuBoard *board,
                                   const HeuristicConfig *config,
@@ -758,8 +824,15 @@ bool sudoku_complete_ac3hb_config(SudokuBoard *board,
     int board_size = sudoku_board_get_board_size(board);
     AC3HBConfig ac3hb_config = ac3hb_get_config(board_size);
     
+    // ✅ Crear registry
+    ForcedCellsRegistry *forced_registry = 
+        forced_cells_registry_create(board_size);
+    
     ConstraintNetwork *net = constraint_network_create(board);
     if (!net) {
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
         return false;
     }
     
@@ -783,12 +856,23 @@ bool sudoku_complete_ac3hb_config(SudokuBoard *board,
         success = ac3hb_solve_iterative(net, board, density_cache,
                                         config,
                                         stats ? stats : &local_stats,
-                                        &ac3hb_config);
+                                        &ac3hb_config,
+                                        forced_registry);
     } else {
         success = ac3hb_solve_recursive(net, board, density_cache,
                                          config,
                                          stats ? stats : &local_stats,
-                                         0, ac3hb_config.max_depth);
+                                         0, ac3hb_config.max_depth,
+                                         forced_registry);
+    }
+    
+    // ✅ Adjuntar o limpiar registry
+    if (success) {
+        sudoku_board_set_forced_cells(board, forced_registry);
+    } else {
+        if (forced_registry) {
+            forced_cells_registry_destroy(forced_registry);
+        }
     }
     
     subgrid_density_cache_destroy(density_cache);
