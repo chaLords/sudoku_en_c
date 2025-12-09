@@ -196,6 +196,7 @@ SudokuBoard* sudoku_board_create_size(int subgrid_size) {
     board->subgrid_size = subgrid_size;
     board->board_size = subgrid_size * subgrid_size;
     board->total_cells = board->board_size * board->board_size;
+    board->forced_cells = NULL;  // Initialize to NULL (will be set later if needed)
     
     // STEP 3: Allocate the dynamic 2D array for cells
     if (!allocate_cells(board, board->board_size)) {
