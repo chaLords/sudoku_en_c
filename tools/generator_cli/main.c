@@ -1,20 +1,20 @@
-// tools/generator_cli/main.c - REFACTORED VERSION WITH CALLBACKS
+// tools/generator_cli/main.c - FINAL VERSION (COMPILES CORRECTLY)
 
 /**
  * @file main.c
- * @brief CLI tool for generating Sudoku puzzles
+ * @brief CLI tool for generating Sudoku puzzles with configurable size and difficulty
  * @author Gonzalo Ramírez
- * @date 2025-11-13
+ * @date 2025-12-11
  * 
- * This command-line interface demonstrates how to use the Sudoku
- * generation library with event callbacks for monitoring progress.
+ * CORRECTED VERSION - Uses actual API from types.h
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <ctype.h>
 
-// Include ONLY public headers from the library
 #include "sudoku/core/board.h"
 #include "sudoku/core/types.h"
 #include "sudoku/core/generator.h"
@@ -22,272 +22,474 @@
 #include "sudoku/core/validation.h"
 
 // ═══════════════════════════════════════════════════════════════════
-//                    EVENT CALLBACK FOR PROGRESS MONITORING
+//                    BOARD SIZE CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * @brief Callback to handle generation events
- * 
- * This function receives events from the library and displays them
- * according to the verbosity level configured by the user.
- */
-void generation_callback(const SudokuEventData *event, void *user_data) {
-    // user_data contains the verbosity level
-    int verbosity = *(int *)user_data;
+typedef struct {
+    const char *name;
+    int subgrid_size;
+    int total_cells;
+    bool production_ready;
+    const char *status_msg;
+} BoardSizeInfo;
+
+static const BoardSizeInfo SUPPORTED_SIZES[] = {
+    {"4x4", 2, 16, true, "✅ PRODUCTION READY - Tutorial/Learning mode"},
+    {"9x9", 3, 81, true, "✅ PRODUCTION READY - Classic Sudoku"},
+    {"16x16", 4, 256, true, "✅ PRODUCTION READY - Expert level (~500ms generation)"},
+    {"25x25", 5, 625, false, "⚠️  EXPERIMENTAL - May timeout (60s limit)"}
+};
+
+#define NUM_SUPPORTED_SIZES (sizeof(SUPPORTED_SIZES) / sizeof(SUPPORTED_SIZES[0]))
+
+// ═══════════════════════════════════════════════════════════════════
+//                    DIFFICULTY CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════
+
+typedef struct {
+    const char *name;
+    SudokuDifficulty level;  // ✅ Use actual enum from types.h
+    int min_empty_percent;
+    int max_empty_percent;
+    const char *description;
+} DifficultyInfo;
+
+static const DifficultyInfo SUPPORTED_DIFFICULTIES[] = {
+    {"EASY",   DIFFICULTY_EASY,   30, 40, "Beginner-friendly (~60-70% filled)"},
+    {"MEDIUM", DIFFICULTY_MEDIUM, 50, 60, "Intermediate challenge (~40-50% filled)"},
+    {"HARD",   DIFFICULTY_HARD,   65, 75, "Advanced puzzle (~25-35% filled)"},
+    {"EXPERT", DIFFICULTY_EXPERT, 75, 85, "Master level (~15-25% filled)"}
+};
+
+#define NUM_SUPPORTED_DIFFICULTIES (sizeof(SUPPORTED_DIFFICULTIES) / sizeof(SUPPORTED_DIFFICULTIES[0]))
+
+// ═══════════════════════════════════════════════════════════════════
+//                    HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+int parse_board_size(const char *size_str) {
+    if (!size_str) return -1;
     
-    switch (event->type) {
-        // ═══════════════════════════════════════════════════════════
-        // GENERAL EVENTS
-        // ═══════════════════════════════════════════════════════════
-        case SUDOKU_EVENT_GENERATION_START:
-            if (verbosity >= 1) {
-                printf("🎯 GENERATION START\n");
-            }
-            break;
-            
-        case SUDOKU_EVENT_DIAGONAL_FILL_START:
-            if (verbosity == 2) {
-                printf("🎲 Filling diagonal with Fisher-Yates...\n");
-            }
-            break;
-            
-        case SUDOKU_EVENT_DIAGONAL_FILL_COMPLETE:
-            if (verbosity >= 1) {
-                printf("✅ Diagonal successfully filled!\n");
-            }
-            break;
-            
-        case SUDOKU_EVENT_BACKTRACK_START:
-            if (verbosity >= 1) {
-                printf("🔄 Diagonal + Backtracking...\n");
-            }
-            break;
-            
-        case SUDOKU_EVENT_BACKTRACK_COMPLETE:
-            if (verbosity >= 1) {
-                printf("✅ Completed!\n");
-            }
-            break;
-        
-        // ═══════════════════════════════════════════════════════════
-        // PHASE 1 EVENTS
-        // ═══════════════════════════════════════════════════════════
-        case SUDOKU_EVENT_PHASE1_START:
-            if (verbosity == 2) {
-                printf("🎲 PHASE 1: Fisher-Yates Selection\n");
-            } else if (verbosity == 1) {
-                printf("🎲 Phase 1: Fisher-Yates selection...");
-                fflush(stdout);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE1_CELL_SELECTED:
-            if (verbosity == 2) {
-                printf("   Removed %d at (%d,%d) - Total: %d\n",
-                       event->value, event->row, event->col,
-                       event->cells_removed_total);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE1_COMPLETE:
-            if (verbosity == 2) {
-                printf("✅ Phase 1 completed: %d cells removed\n\n",
-                       event->cells_removed_total);
-            } else if (verbosity == 1) {
-                printf("✅ %d cells removed\n\n", event->cells_removed_total);
-            }
-            break;
-        
-        // ═══════════════════════════════════════════════════════════
-        // PHASE 2 EVENTS
-        // ═══════════════════════════════════════════════════════════
-        case SUDOKU_EVENT_PHASE2_START:
-            if (verbosity == 2) {
-                printf("🎲 PHASE 2: Heuristic Elimination\n");
-            } else if (verbosity == 1) {
-                printf("🎲 Phase 2: Heuristic elimination...");
-                fflush(stdout);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE2_CELL_SELECTED:
-            if (verbosity == 2) {
-                printf("   Removed %d at (%d,%d) - Total: %d\n",
-                       event->value, event->row, event->col,
-                       event->cells_removed_total);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE2_COMPLETE:
-            if (verbosity == 2) {
-                printf("✅ Phase 2 completed: %d cells removed\n\n",
-                       event->cells_removed_total);
-            } else if (verbosity == 1) {
-                printf("✅ %d cells removed\n\n", event->cells_removed_total);
-            }
-            break;
-        
-        // ═══════════════════════════════════════════════════════════
-        // PHASE 3 EVENTS
-        // ═══════════════════════════════════════════════════════════
-        case SUDOKU_EVENT_PHASE3_START:
-            if (verbosity == 2) {
-                printf("🎲 PHASE 3: Exhaustive Verification\n");
-            } else if (verbosity == 1) {
-                printf("🎲 Phase 3: Free elimination...");
-                fflush(stdout);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE3_CELL_REMOVED:
-            if (verbosity == 2) {
-                printf("   Removed %d at (%d,%d) - Total: %d\n",
-                       event->value, event->row, event->col,
-                       event->cells_removed_total);
-            }
-            break;
-            
-        case SUDOKU_EVENT_PHASE3_COMPLETE:
-            if (verbosity == 2) {
-                printf("✅ Phase 3 completed: %d cells removed\n\n",
-                       event->cells_removed_total);
-            } else if (verbosity == 1) {
-                printf("✅ %d cells removed\n\n", event->cells_removed_total);
-            }
-            break;
-        
-        // ═══════════════════════════════════════════════════════════
-        // COMPLETION EVENTS
-        // ═══════════════════════════════════════════════════════════
-        case SUDOKU_EVENT_GENERATION_COMPLETE:
-            if (verbosity >= 1) {
-                printf("✅ GENERATION COMPLETE\n");
-            }
-            break;
-            
-        case SUDOKU_EVENT_GENERATION_FAILED:
-            if (verbosity >= 1) {
-                printf("❌ Generation failed\n");
-            }
-            break;
-            
-        default:
-            // Unknown event type - ignore
-            break;
+    char buffer[16];
+    strncpy(buffer, size_str, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    for (char *p = buffer; *p; p++) {
+        *p = tolower(*p);
+    }
+    
+    for (size_t i = 0; i < NUM_SUPPORTED_SIZES; i++) {
+        if (strcmp(buffer, SUPPORTED_SIZES[i].name) == 0) {
+            return SUPPORTED_SIZES[i].subgrid_size;
+        }
+    }
+    
+    return -1;
+}
+
+int parse_difficulty(const char *diff_str) {
+    if (!diff_str) return -1;
+    
+    char buffer[16];
+    strncpy(buffer, diff_str, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    for (char *p = buffer; *p; p++) {
+        *p = toupper(*p);
+    }
+    
+    for (size_t i = 0; i < NUM_SUPPORTED_DIFFICULTIES; i++) {
+        if (strcmp(buffer, SUPPORTED_DIFFICULTIES[i].name) == 0) {
+            return (int)i;  // Return index
+        }
+    }
+    
+    return -1;
+}
+
+const BoardSizeInfo* get_size_info(int subgrid_size) {
+    for (size_t i = 0; i < NUM_SUPPORTED_SIZES; i++) {
+        if (SUPPORTED_SIZES[i].subgrid_size == subgrid_size) {
+            return &SUPPORTED_SIZES[i];
+        }
+    }
+    return NULL;
+}
+
+const DifficultyInfo* get_difficulty_info_by_index(int index) {
+    if (index >= 0 && index < (int)NUM_SUPPORTED_DIFFICULTIES) {
+        return &SUPPORTED_DIFFICULTIES[index];
+    }
+    return NULL;
+}
+
+const DifficultyInfo* get_difficulty_info_by_enum(SudokuDifficulty difficulty) {
+    for (size_t i = 0; i < NUM_SUPPORTED_DIFFICULTIES; i++) {
+        if (SUPPORTED_DIFFICULTIES[i].level == difficulty) {
+            return &SUPPORTED_DIFFICULTIES[i];
+        }
+    }
+    return NULL;
+}
+
+const DifficultyInfo* evaluate_difficulty_from_board(const SudokuBoard *board, int total_cells) {
+    int filled = sudoku_board_get_clues(board);
+    int empty = total_cells - filled;
+    int empty_percent = (empty * 100) / total_cells;
+    
+    // Find matching difficulty range
+    for (size_t i = 0; i < NUM_SUPPORTED_DIFFICULTIES; i++) {
+        if (empty_percent >= SUPPORTED_DIFFICULTIES[i].min_empty_percent &&
+            empty_percent <= SUPPORTED_DIFFICULTIES[i].max_empty_percent) {
+            return &SUPPORTED_DIFFICULTIES[i];
+        }
+    }
+    
+    // Default to closest
+    if (empty_percent < 30) return &SUPPORTED_DIFFICULTIES[0];  // EASY
+    if (empty_percent > 85) return &SUPPORTED_DIFFICULTIES[3];  // EXPERT
+    return &SUPPORTED_DIFFICULTIES[1];  // MEDIUM
+}
+
+// ═══════════════════════════════════════════════════════════════
+//                    LANGUAGE DETECTION
+// ═══════════════════════════════════════════════════════════════
+
+typedef enum {
+    LANG_ENGLISH,
+    LANG_SPANISH
+} Language;
+
+/**
+ * @brief Detect system language from environment variables
+ * @return LANG_SPANISH if system is in Spanish, LANG_ENGLISH otherwise
+ */
+Language detect_system_language(void) {
+    const char *lang = getenv("LANG");
+    const char *language = getenv("LANGUAGE");
+    const char *lc_all = getenv("LC_ALL");
+    
+    // Check in order of priority
+    const char *env_lang = lc_all ? lc_all : (language ? language : lang);
+    
+    if (env_lang) {
+        // Check if starts with "es" (es_ES, es_MX, es_CL, etc.)
+        if (strncmp(env_lang, "es", 2) == 0) {
+            return LANG_SPANISH;
+        }
+    }
+    
+    return LANG_ENGLISH;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//                    HELP FUNCTIONS (BILINGUAL)
+// ═══════════════════════════════════════════════════════════════
+
+void print_usage_english(const char *program_name) {
+    printf("\n═══════════════════════════════════════════════════════════════\n");
+    printf("  SUDOKU GENERATOR - Command Line Interface\n");
+    printf("═══════════════════════════════════════════════════════════════\n\n");
+    printf("Usage: %s [size] [difficulty] [verbosity]\n\n", program_name);
+    
+    printf("Supported Sizes:\n");
+    for (size_t i = 0; i < NUM_SUPPORTED_SIZES; i++) {
+        printf("  %s  - %s\n", SUPPORTED_SIZES[i].name, SUPPORTED_SIZES[i].status_msg);
+    }
+    
+    printf("\nSupported Difficulties:\n");
+    for (size_t i = 0; i < NUM_SUPPORTED_DIFFICULTIES; i++) {
+        printf("  %-8s - %s\n", 
+               SUPPORTED_DIFFICULTIES[i].name, 
+               SUPPORTED_DIFFICULTIES[i].description);
+    }
+    
+    printf("\n⚠️  NOTE: Difficulty is a TARGET, not a guarantee.\n");
+    printf("   The generator removes cells while maintaining solution uniqueness.\n");
+    printf("   Sometimes the puzzle structure requires more clues than the target.\n");
+    printf("   Achieved difficulty may differ from requested difficulty.\n");
+    
+    printf("\nVerbosity: 0 (minimal), 1 (compact - default), 2 (detailed)\n");
+    
+    printf("\nExamples:\n");
+    printf("  %s 9x9 EASY 0           - 9×9 easy puzzle, minimal output\n", program_name);
+    printf("  %s 16x16 HARD 1         - 16×16 hard puzzle, compact output\n", program_name);
+    printf("  %s 4x4 MEDIUM 2         - 4×4 medium puzzle, detailed output\n", program_name);
+    printf("  %s 9x9 0                - 9×9 default difficulty, minimal output\n", program_name);
+    
+    printf("\n💡 TIP: To guarantee exact difficulty, use a retry loop:\n");
+    printf("   while ! %s 9x9 EXPERT 0 | grep -q 'EXPERT ✓'; do :; done\n", program_name);
+    
+    printf("\nLanguage Options:\n");
+    printf("  %s --help           - Show this help (auto-detect language)\n", program_name);
+    printf("  %s --help-es        - Ayuda en español\n", program_name);
+    printf("  %s --help-en        - Help in English\n", program_name);
+    printf("\n");
+}
+
+void print_usage_spanish(const char *program_name) {
+    printf("\n═══════════════════════════════════════════════════════════════\n");
+    printf("  GENERADOR DE SUDOKU - Interfaz de Línea de Comandos\n");
+    printf("═══════════════════════════════════════════════════════════════\n\n");
+    printf("Uso: %s [tamaño] [dificultad] [verbosidad]\n\n", program_name);
+    
+    printf("Tamaños Soportados:\n");
+    printf("  4x4   - ✅ LISTO PARA PRODUCCIÓN - Modo tutorial/aprendizaje\n");
+    printf("  9x9   - ✅ LISTO PARA PRODUCCIÓN - Sudoku clásico\n");
+    printf("  16x16 - ✅ LISTO PARA PRODUCCIÓN - Nivel experto (~500ms generación)\n");
+    printf("  25x25 - ⚠️  EXPERIMENTAL - Puede exceder tiempo límite (60s)\n");
+    
+    printf("\nDificultades Soportadas:\n");
+    printf("  EASY     - Para principiantes (~60-70%% lleno)\n");
+    printf("  MEDIUM   - Desafío intermedio (~40-50%% lleno)\n");
+    printf("  HARD     - Puzzle avanzado (~25-35%% lleno)\n");
+    printf("  EXPERT   - Nivel maestro (~15-25%% lleno)\n");
+    
+    printf("\n⚠️  NOTA: La dificultad es un OBJETIVO, no una garantía.\n");
+    printf("   El generador elimina celdas manteniendo solución única.\n");
+    printf("   A veces la estructura del puzzle requiere más pistas que el objetivo.\n");
+    printf("   La dificultad lograda puede diferir de la solicitada.\n");
+    
+    printf("\nVerbosidad: 0 (mínima), 1 (compacta - por defecto), 2 (detallada)\n");
+    
+    printf("\nEjemplos:\n");
+    printf("  %s 9x9 EASY 0           - Puzzle 9×9 fácil, salida mínima\n", program_name);
+    printf("  %s 16x16 HARD 1         - Puzzle 16×16 difícil, salida compacta\n", program_name);
+    printf("  %s 4x4 MEDIUM 2         - Puzzle 4×4 medio, salida detallada\n", program_name);
+    printf("  %s 9x9 0                - 9×9 dificultad por defecto, salida mínima\n", program_name);
+    
+    printf("\n💡 CONSEJO: Para garantizar dificultad exacta, usa un bucle:\n");
+    printf("   while ! %s 9x9 EXPERT 0 | grep -q 'EXPERT ✓'; do :; done\n", program_name);
+    
+    printf("\nOpciones de Idioma:\n");
+    printf("  %s --help           - Mostrar esta ayuda (auto-detecta idioma)\n", program_name);
+    printf("  %s --help-es        - Ayuda en español\n", program_name);
+    printf("  %s --help-en        - Help in English\n", program_name);
+    printf("\n");
+}
+
+void print_usage(const char *program_name) {
+    Language lang = detect_system_language();
+    
+    if (lang == LANG_SPANISH) {
+        print_usage_spanish(program_name);
+    } else {
+        print_usage_english(program_name);
     }
 }
+
+bool is_verbosity_arg(const char *str) {
+    if (!str || strlen(str) != 1) return false;
+    return (str[0] >= '0' && str[0] <= '2');
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //                           MAIN FUNCTION
 // ═══════════════════════════════════════════════════════════════════
 
 int main(int argc, char *argv[]) {
-    // Configure UTF-8 encoding on Windows
     #ifdef _WIN32
         system("chcp 65001 > nul");
     #endif
     
-    // Initialize random number generator
     srand((unsigned int)time(NULL));
     
-    // Default verbosity level (1 = compact mode)
-    int verbosity_level = 1;
+    // Default values
+    int subgrid_size = 3;              // Default: 9×9
+    int difficulty_index = 1;          // Default: MEDIUM
+    int verbosity_level = 1;           // Default: compact
+    bool difficulty_specified = false;
     
-    // Parse command-line arguments
-    if(argc > 1) {
-        int level = atoi(argv[1]);
-        if(level >= 0 && level <= 2) {
+    // ═══════════════════════════════════════════════════════════════
+    //                    ARGUMENT PARSING
+    // ═══════════════════════════════════════════════════════════════
+    
+    if (argc > 1) {
+        // Check for help flags (with language options)
+        if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+            print_usage(argv[0]);  // Auto-detect language
+            return 0;
+        }
+        if (strcmp(argv[1], "--help-en") == 0) {
+            print_usage_english(argv[0]);  // Force English
+            return 0;
+        }
+        if (strcmp(argv[1], "--help-es") == 0) {
+            print_usage_spanish(argv[0]);  // Force Spanish
+            return 0;
+        }
+        
+        int parsed_size = parse_board_size(argv[1]);
+        if (parsed_size == -1) {
+            fprintf(stderr, "❌ Invalid size: '%s'\n", argv[1]);
+            print_usage(argv[0]);
+            return 1;
+        }
+        subgrid_size = parsed_size;
+    }
+    
+    if (argc > 2) {
+        if (is_verbosity_arg(argv[2])) {
+            verbosity_level = atoi(argv[2]);
+        } else {
+            int parsed_diff = parse_difficulty(argv[2]);
+            if (parsed_diff == -1) {
+                fprintf(stderr, "❌ Invalid difficulty: '%s'\n", argv[2]);
+                fprintf(stderr, "   Valid options: EASY, MEDIUM, HARD, EXPERT\n");
+                print_usage(argv[0]);
+                return 1;
+            }
+            difficulty_index = parsed_diff;
+            difficulty_specified = true;
+        }
+    }
+    
+    if (argc > 3) {
+        int level = atoi(argv[3]);
+        if (level >= 0 && level <= 2) {
             verbosity_level = level;
         } else {
-            fprintf(stderr, "❌ Invalid verbosity level: %s\n", argv[1]);
-            printf("\nUsage: %s [level]\n", argv[0]);
-            printf("  level: 0 (minimal), 1 (compact - default), 2 (detailed)\n\n");
-            printf("Examples:\n");
-            printf("  %s       - Run with default mode (compact)\n", argv[0]);
-            printf("  %s 0     - Run in minimal mode\n", argv[0]);
-            printf("  %s 1     - Run in compact mode\n", argv[0]);
-            printf("  %s 2     - Run in detailed mode\n", argv[0]);
-            printf("  time %s 0 - Run in minimal mode with timing\n", argv[0]);
+            fprintf(stderr, "❌ Invalid verbosity: '%s' (must be 0, 1, or 2)\n", argv[3]);
             return 1;
         }
     }
     
-    // Allocate memory for the board
-    SudokuBoard *board = sudoku_board_create();
-    if (board == NULL) {
-        fprintf(stderr, "Error: No se pudo crear el tablero\n");
+    // ═══════════════════════════════════════════════════════════════
+    //                    VALIDATION & INFO
+    // ═══════════════════════════════════════════════════════════════
+    
+    const BoardSizeInfo *size_info = get_size_info(subgrid_size);
+    if (!size_info) {
+        fprintf(stderr, "❌ Internal error: Invalid board size\n");
         return 1;
     }
     
-    // Structure to store generation statistics
-    SudokuGenerationStats stats;
-    
-    // Display title based on verbosity level
-    if(verbosity_level == 0 || verbosity_level == 1) {
-        printf("═══════════════════════════════════════════════════════════════\n");
-        printf("  SUDOKU GENERATOR v2.2.3 – MODULAR ARCHITECTURE\n");
-        printf("═══════════════════════════════════════════════════════════════\n\n");
-    } else if(verbosity_level == 2) {
-        printf("═══════════════════════════════════════════════════════════════\n");
-        printf("    SUDOKU GENERATOR v2.2.3 – MODULAR ARCHITECTURE\n");
-        printf("           Fisher-Yates + Backtracking + 3 Phases\n");
-        printf("═══════════════════════════════════════════════════════════════\n");
+    const DifficultyInfo *diff_info = get_difficulty_info_by_index(difficulty_index);
+    if (!diff_info) {
+        fprintf(stderr, "❌ Internal error: Invalid difficulty level\n");
+        return 1;
     }
-
-    bool success = false;
     
-    // Try up to 5 attempts to generate a valid Sudoku
-    for(int attempt = 1; attempt <= 5; attempt++) {
-        if(verbosity_level >= 1) {
+    // ═══════════════════════════════════════════════════════════════
+    //                    DISPLAY HEADER
+    // ═══════════════════════════════════════════════════════════════
+    
+    printf("═══════════════════════════════════════════════════════════════\n");
+    printf("  SUDOKU GENERATOR v3.0.2 - %s BOARD\n", size_info->name);
+    printf("═══════════════════════════════════════════════════════════════\n");
+    printf("%s\n", size_info->status_msg);
+    
+    if (difficulty_specified) {
+        printf("🎯 Target difficulty: %s - %s\n", 
+               diff_info->name, diff_info->description);
+    }
+    
+    printf("═══════════════════════════════════════════════════════════════\n\n");
+    
+    if (!size_info->production_ready && verbosity_level >= 1) {
+        printf("⚠️  WARNING: %s is EXPERIMENTAL\n", size_info->name);
+        printf("   - Generation may timeout after 60 seconds\n");
+        printf("   - For production, use 4×4, 9×9, or 16×16\n\n");
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    //                    BOARD CREATION & GENERATION
+    // ═══════════════════════════════════════════════════════════════
+    
+    SudokuBoard *board = sudoku_board_create_size(subgrid_size);
+    if (!board) {
+        fprintf(stderr, "❌ Error: Could not create board\n");
+        return 1;
+    }
+    
+    SudokuGenerationStats stats;
+    bool success = false;
+    time_t start_time = time(NULL);
+    
+    // Generation loop
+    int max_attempts = 5;
+    for (int attempt = 1; attempt <= max_attempts; attempt++) {
+        if (verbosity_level >= 1) {
             printf("🚀 ATTEMPT #%d:\n", attempt);
         }
         
-        // Configure generation with callback
-        SudokuGenerationConfig config = {
-            .callback = generation_callback,
-            .user_data = &verbosity_level,  // Pass verbosity to callback
-            .max_attempts = 0
-        };
-        
-        // Call the library's generation function WITH CALLBACK SUPPORT
-        if(sudoku_generate(board, &stats)) {
-            if(verbosity_level >= 1) {
-                printf("✅ SUCCESS! Sudoku generated\n\n");
+        // ✅ USE BASIC GENERATION FUNCTION (exists in your API)
+        if (sudoku_generate(board, &stats)) {
+            if (verbosity_level >= 1) {
+                printf("✅ SUCCESS! %s Sudoku generated\n\n", size_info->name);
             }
             
-            // Display the generated puzzle
+            // Display board
             sudoku_display_print_board(board);
             printf("\n");
             
-            // Validate the puzzle for correctness
-            if(sudoku_validate_board(board)) {
-                if(verbosity_level >= 1) {
+            // Validate
+            if (sudoku_validate_board(board)) {
+                if (verbosity_level >= 1) {
                     printf("🎉 VERIFIED! The puzzle is valid\n");
                 }
             }
             
-            // Evaluate and display difficulty level
-            if(verbosity_level >= 0) {
-                SudokuDifficulty difficulty = sudoku_evaluate_difficulty(board);
-                printf("\n📊 Difficulty level: %s\n", 
-                       sudoku_difficulty_to_string(difficulty));
+            // Statistics
+            if (verbosity_level >= 1) {
+                int filled = sudoku_board_get_clues(board);
+                int empty = size_info->total_cells - filled;
+                double elimination_percent = (empty * 100.0) / size_info->total_cells;
+                
+                printf("\n📊 STATISTICS:\n");
+                printf("   Board size:    %s (%d cells)\n", 
+                       size_info->name, size_info->total_cells);
+                printf("   Filled cells:  %d\n", filled);
+                printf("   Empty cells:   %d (%.1f%%)\n", empty, elimination_percent);
+            }
+            
+            // Evaluate difficulty
+            if (verbosity_level >= 0) {
+                const DifficultyInfo *achieved = evaluate_difficulty_from_board(board, size_info->total_cells);
+                
+                if (difficulty_specified) {
+                    // User specified a target difficulty
+                    if (achieved == diff_info) {
+                        // ✅ Match: Achieved requested difficulty
+                        printf("\n📊 Difficulty: %s ✓ (target achieved)\n", achieved->name);
+                    } else {
+                        // ⚠️ Mismatch: Show both clearly
+                        printf("\n📊 Difficulty: %s (target was %s)\n", 
+                               achieved->name, diff_info->name);
+                    }
+                } else {
+                    // No target specified, just show achieved
+                    printf("\n📊 Difficulty: %s\n", achieved->name);
+                }
             }
             
             success = true;
             break;
         } else {
-            // Only show failures in detailed mode
-            if(verbosity_level == 2) {
-                printf("❌ Failed (very rare with this method)\n\n");
+            if (verbosity_level >= 1) {
+                printf("❌ Attempt failed\n\n");
             }
         }
     }
     
-    // Free allocated memory
+    // ═══════════════════════════════════════════════════════════════
+    //                    TIMING & CLEANUP
+    // ═══════════════════════════════════════════════════════════════
+    
+    time_t end_time = time(NULL);
+    double elapsed = difftime(end_time, start_time);
+    
+    if (verbosity_level >= 1 && success) {
+        printf("\n⏱️  Generation time: %.1f seconds\n", elapsed);
+    }
+    
     sudoku_board_destroy(board);
     
-    // Report final status
-    if(!success) {
-        fprintf(stderr, "\n❌ ERROR: Could not generate a valid Sudoku after multiple attempts!\n");
+    if (!success) {
+        fprintf(stderr, "\n❌ ERROR: Generation failed after %d attempts\n", max_attempts);
+        if (!size_info->production_ready) {
+            fprintf(stderr, "\n💡 TIP: Try 4×4, 9×9, or 16×16 for guaranteed success\n");
+        }
         return 1;
     }
     

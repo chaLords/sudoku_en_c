@@ -1,135 +1,175 @@
 /**
  * @file display.c
- * @brief Display and visualization functions for Sudoku boards
+ * @brief Display and visualization functions for Sudoku boards (Multi-size)
  * @author Gonzalo Ramírez
- * @date 2025-11-06
+ * @date 2025-12-11
  * 
- * This module handles all visual representation of Sudoku boards,
- * including formatted printing to console. Separating display logic
- * from data management allows for multiple output formats and
- * easier maintenance of presentation layer.
- * 
- * The current implementation focuses on console output with Unicode
- * box-drawing characters. Future versions will add file export
- * capabilities in various formats (HTML, PDF, plain text).
+ * FIXED VERSION v3.0.2c - Square aspect ratio
  */
 
 #include <stdio.h>
+#include <math.h>
 #include "sudoku/core/display.h"
 #include "sudoku/core/types.h"
-#include "internal/board_internal.h"        // For internal function declarations
+#include "sudoku/core/board.h"
+#include "internal/board_internal.h"
 
 // ═══════════════════════════════════════════════════════════════
-//                    CONSOLE OUTPUT FUNCTIONS
+//                    HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
+
+static int calculate_cell_width(int board_size) {
+    if (board_size <= 9) return 1;
+    if (board_size <= 99) return 2;
+    return 3;
+}
 
 /**
- * @brief Print the Sudoku board with formatted box-drawing characters
+ * @brief Print horizontal border with square aspect ratio
  * 
- * Creates a visually appealing representation of the board using Unicode
- * box-drawing characters for a professional console output. Empty cells
- * are displayed as dots (.), filled cells show their numbers (1-9).
- * The 3x3 subgrid structure is clearly delineated with thicker borders.
- * 
- * Output format uses Unicode box-drawing characters:
- * - ┌ ┬ ┐ └ ┴ ┘ for corners
- * - ─ for horizontal lines
- * - │ for vertical lines
- * - ├ ┼ ┤ for intersections
- * 
- * The display automatically includes statistics (empty cells, clues)
- * when the global verbosity level is set to 1 or higher.
- * 
- * @param[in] board Pointer to the board to display
- * 
- * @pre board != NULL
- * @pre board is properly initialized (via sudoku_board_init or sudoku_generate)
- * 
- * @note Requires UTF-8 terminal support for proper character rendering.
- *       On Windows, set code page 65001: `chcp 65001`
- * @note Output goes to stdout. For file output, redirect or use alternative
- *       export functions when available
- * @note The display format is optimized for 80-column terminals
- * 
- * @warning On terminals without Unicode support, box-drawing characters
- *          may render as question marks or other replacement characters
- * 
- * Example output:
- * @code
- * ┌───────┬───────┬───────┐
- * │ . 2 7 │ . 4 . │ . . . │
- * │ . 5 . │ 7 . . │ 2 8 4 │
- * │ 9 1 . │ . 8 . │ 3 . 5 │
- * ├───────┼───────┼───────┤
- * │ . 8 2 │ . 3 7 │ . 1 9 │
- * │ . 3 9 │ 4 1 5 │ 6 2 . │
- * │ . . 1 │ 2 8 9 │ 7 . . │
- * ├───────┼───────┼───────┤
- * │ . . 8 │ . . 6 │ . 5 2 │
- * │ . 7 . │ . . 4 │ 8 . 1 │
- * │ 1 4 5 │ 3 . 8 │ . 6 7 │
- * └───────┴───────┴───────┘
- * 📊 Empty: 35 | Clues: 46
- * @endcode
- * 
- * @see sudoku_set_verbosity() to control statistics display
- * @see sudoku_board_init() for board initialization
+ * Each cell occupies (cell_width + 1) characters:
+ * - 1 leading space
+ * - cell_width for the number
+ * No trailing space (makes it more compact and square)
  */
-void sudoku_display_print_board(const SudokuBoard *board) {
-    // Top border with corners and horizontal lines
-    printf("┌───────┬───────┬───────┐\n");
+static void print_horizontal_border(char border_type, int subgrid_size, 
+                                   int cell_width) {
+    const char *left, *junction, *right;
+    const char *horizontal = "─";
     
-    // Process each row of the 9x9 grid
-    for(int i = 0; i < SUDOKU_SIZE; i++) {
-        printf("│");
+    switch (border_type) {
+        case 'T':
+            left = " ┌";
+            junction = "─┬";
+            right = "─┐";
+            break;
+        case 'M':
+            left = " ├";
+            junction = "─┼";
+            right = "─┤";
+            break;
+        case 'B':
+            left = " └";
+            junction = "─┴";
+            right = "─┘";
+            break;
+        default:
+            return;
+    }
+    
+    printf("%s", left);
+    
+    for (int sg_col = 0; sg_col < subgrid_size; sg_col++) {
+        for (int cell = 0; cell < subgrid_size; cell++) {
+            // ✅ Each cell = (cell_width + 1) for square aspect
+            for (int w = 0; w < (cell_width + 1); w++) {
+                printf("%s", horizontal);
+            }
+        }
         
-        // Print each cell in the current row
-        for(int j = 0; j < SUDOKU_SIZE; j++) {
-            if(board->cells[i][j] == 0) {
-                printf(" .");  // Empty cell represented as dot
+        if (sg_col < subgrid_size - 1) {
+            printf("%s", junction);
+        } else {
+            printf("%s\n", right);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//                    PUBLIC DISPLAY FUNCTION
+// ═══════════════════════════════════════════════════════════════
+
+void sudoku_display_print_board(const SudokuBoard *board) {
+    if (board == NULL) {
+        fprintf(stderr, "Error: Cannot display NULL board\n");
+        return;
+    }
+    
+    int subgrid_size = sudoku_board_get_subgrid_size(board);
+    int board_size = sudoku_board_get_board_size(board);
+    
+    if (subgrid_size < 2 || board_size < 4) {
+        fprintf(stderr, "Error: Invalid board dimensions\n");
+        return;
+    }
+    
+    int cell_width = calculate_cell_width(board_size);
+    
+    // Top border
+    print_horizontal_border('T', subgrid_size, cell_width);
+    
+    // Board rows
+    for (int row = 0; row < board_size; row++) {
+        printf(" │");
+        
+        for (int col = 0; col < board_size; col++) {
+            int value = sudoku_board_get_cell(board, row, col);
+            
+            // ✅ Format: " %*d" = 1 space + cell_width (NO trailing space)
+            if (value == 0) {
+                printf(" %*s", cell_width, ".");
             } else {
-                printf(" %d", board->cells[i][j]);  // Filled cell shows number
+                printf(" %*d", cell_width, value);
             }
             
-            // Vertical separator after every 3rd column (subgrid boundary)
-            if((j + 1) % 3 == 0) {
+            // Vertical separator at subgrid boundaries
+            if ((col + 1) % subgrid_size == 0) {
                 printf(" │");
+            }
+        }
+        
+        printf("\n");
+        
+        // Horizontal separator at subgrid boundaries
+        if ((row + 1) % subgrid_size == 0 && row < board_size - 1) {
+            print_horizontal_border('M', subgrid_size, cell_width);
+        }
+    }
+    
+    // Bottom border
+    print_horizontal_border('B', subgrid_size, cell_width);
+    
+    // Statistics
+    int clues = sudoku_board_get_clues(board);
+    int empty = sudoku_board_get_empty(board);
+    
+    printf("\n📊 Empty: %d | Clues: %d\n", empty, clues);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//                    COMPACT DISPLAY (OPTIONAL)
+// ═══════════════════════════════════════════════════════════════
+
+void sudoku_display_print_compact(const SudokuBoard *board) {
+    if (board == NULL) return;
+    
+    int subgrid_size = sudoku_board_get_subgrid_size(board);
+    int board_size = sudoku_board_get_board_size(board);
+    int cell_width = calculate_cell_width(board_size);
+    
+    for (int row = 0; row < board_size; row++) {
+        for (int col = 0; col < board_size; col++) {
+            int value = sudoku_board_get_cell(board, row, col);
+            
+            if (value == 0) {
+                printf("%*s", cell_width, ".");
+            } else {
+                printf("%*d", cell_width, value);
+            }
+            
+            printf(" ");
+            
+            if ((col + 1) % subgrid_size == 0 && col < board_size - 1) {
+                printf("| ");
             }
         }
         printf("\n");
         
-        // Horizontal separator after every 3rd row (subgrid boundary)
-        // Skip after the last row (row 8) to use bottom border instead
-        if((i + 1) % 3 == 0 && i < SUDOKU_SIZE - 1) {
-            printf("├───────┼───────┼───────┤\n");
+        if ((row + 1) % subgrid_size == 0 && row < board_size - 1) {
+            for (int i = 0; i < board_size * (cell_width + 1) + subgrid_size; i++) {
+                printf("─");
+            }
+            printf("\n");
         }
     }
-    
-    // Bottom border with corners and horizontal lines
-    printf("└───────┴───────┴───────┘\n");
-    // Optional statistics display controlled by verbosity level
-    printf("📊 Empty: %d | Clues: %d\n", board->empty, board->clues);
 }
-
-// ═══════════════════════════════════════════════════════════════
-//                    FUTURE: FILE OUTPUT FUNCTIONS
-// ═══════════════════════════════════════════════════════════════
-
-/*
- * Future functions planned for this section:
- * - sudoku_display_save_to_file()    - Save board to text file
- * - sudoku_display_export_ascii()    - Plain ASCII version (no Unicode)
- * - sudoku_display_export_html()     - HTML table format
- * - sudoku_display_export_json()     - JSON representation
- */
-
-// ═══════════════════════════════════════════════════════════════
-//                    FUTURE: FORMATTED STRING FUNCTIONS
-// ═══════════════════════════════════════════════════════════════
-
-/*
- * Future functions planned for this section:
- * - sudoku_display_to_string()       - Return board as formatted string
- * - sudoku_display_compact_format()  - One-line representation
- * - sudoku_display_debug_format()    - Verbose format with metadata
- */
